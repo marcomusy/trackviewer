@@ -18,6 +18,6 @@ Adjust the paths in `main.py` then:
 python main.py
 ```
 
-![](https://user-images.githubusercontent.com/32848391/170561122-ce4f0b34-f8f0-4a67-9bcf-1ab3cd852148.png)
+![](https://user-images.githubusercontent.com/32848391/170732631-fa09c908-1f1c-4816-a805-09030043ccc6.png)
 
 
