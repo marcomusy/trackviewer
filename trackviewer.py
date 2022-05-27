@@ -4,7 +4,7 @@ import vedo
 from rich.table import Table
 from rich.console import Console
 
-_version = 0.1
+_version = 0.2
 
 ######################################################
 class TrackViewer:
@@ -30,6 +30,7 @@ class TrackViewer:
         self.sox9name = 'MEAN_INTENSITY_CH1'
         self.rng = ()
         self.uniquetracks = []
+        self.closer_trackid = None
 
         self.camera = dict(
             pos=(1147, -1405, 1198),
@@ -44,6 +45,7 @@ class TrackViewer:
             "- r to reset camera\n"
             "- l to show track line\n"
             "- c to show closest ids\n"
+            "- x to jump to track\n"
             "- q to quit"
         )
         self._slider1 = None
@@ -156,6 +158,8 @@ class TrackViewer:
 
         vpts = vedo.Points(trackpts_at_frame)
         cids = vpts.closestPoint(pt, N=self.nclosest, returnPointId=True)
+        self.closer_trackid = trackid.to_numpy()[cids[0]]
+
         # print("closestPoint ids", cids)
         # print("closestPoint spotid, trackid", ids[cids])
 
@@ -177,7 +181,7 @@ class TrackViewer:
             d = vedo.utils.precision(d, 4)
             rtable.add_row(str(i), str(int(a)), str(int(b)), str(int(c)), d, str(int(e)), str(f))
         console = Console()
-        console.print(rtable, justify="center")
+        console.print(rtable)
         return ids[cids]
 
     ######################################################
@@ -248,7 +252,6 @@ class TrackViewer:
         pt = np.array([evt.picked3d[0], evt.picked3d[1], self.frame])
         self.getclosest(pt)
 
-
     ######################################################
     def on_keypress(self, evt):
         """Press keys to perform some action"""
@@ -288,6 +291,14 @@ class TrackViewer:
             trackline2d.name = "track2d"
             self.plt.at(1).remove("track2d").add(trackline2d)
             return
+
+        elif evt.keyPressed == "x":
+            if self.closer_trackid is None:
+                vedo.printc("Please click a point or press c before x", c='r')
+                return
+            vedo.printc(" -> jumping to track id", self.closer_trackid)
+            self.track = self.closer_trackid
+            self.closer_trackid = None
 
         elif evt.keyPressed == "c":
             self.getclosest()

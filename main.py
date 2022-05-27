@@ -17,10 +17,12 @@ tif_path = vedo.io.download("https://vedo.embl.es/examples/data/sox9_labels_test
 # Create the viewer
 tv = TrackViewer()
 
-# Customize the viewer:
+# Customize the viewer
 tv.channel = 2
-# tv.cmap='Greys_r'
-# tv.nclosest = 10
+tv.sox9name = "MEAN_INTENSITY_CH1"
+tv.nclosest = 10
+tv.maxvelocity = 10
+tv.lscale = 6   # size of labels
 
 # Load the data
 tv.loadTracks(csv_path)
