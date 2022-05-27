@@ -1,6 +1,8 @@
 import numpy as np
 import pandas
 import vedo
+from rich.table import Table
+from rich.console import Console
 
 ######################################################
 class TrackViewer:
@@ -13,14 +15,18 @@ class TrackViewer:
         self.track = 0
         self.nframes = 0
         self.ntracks = 0
-        self.slider1 = None
-        self.slider2 = None
         self.dataframe = None
         self.volume = None
-        # self.volspot = None
-        self.slices = []
         self.maxvelocity = 20
         self.nclosest = 10
+        self.skiprows = (1,2,3)
+        self.channel = 2
+        self.lcolor = 'white'
+        self.lscale = 4
+        self.fieldname = 'RADIUS'
+        self.sox9name = 'MEAN_INTENSITY_CH1'
+        self.rng = ()
+        self.uniquetracks = []
 
         self.info = ("Press:\n"
                     "- arrows to navigate\n"
@@ -30,22 +36,29 @@ class TrackViewer:
                     "- c to show closest ids\n"
                     "- q to quit")
 
+        self._slider1 = None
+        self._slider2 = None
+        self._cornerplot = None
+
         vedo.settings.enableDefaultMouseCallbacks = False
         vedo.settings.enableDefaultKeyboardCallbacks = False
 
         self.plt = vedo.Plotter(N=2, sharecam=False, title="Track Viewer", size=(2200,1100))
-        self.plt.addCallback("click mouse", self.on_click)
-        self.plt.addCallback("key press", self.on_keypress)
+        self._callback1 = self.plt.addCallback("click mouse", self.on_click)
+        self._callback2 = self.plt.addCallback("key press", self.on_keypress)
 
 
     ######################################################
     def loadTracks(self, filename):
         """Load the track data from a cvs file"""
         vedo.printc("Loading track data from", filename, c="y")
-        self.dataframe = pandas.read_csv(filename)
-        self.ntracks = int(max(self.dataframe["TRACK_ID"]))
+        self.dataframe = pandas.read_csv(filename, skip_blank_lines=True, skiprows=self.skiprows)
 
-        self.slider2 = self.plt.at(1).addSlider2D(
+        self.ntracks = int(max(self.dataframe["TRACK_ID"]))
+        # self.uniquetracks = np.unique(self.dataframe["TRACK_ID"].to_numpy())
+        # self.ntracks = len(self.uniquetracks)
+
+        self._slider2 = self.plt.at(1).addSlider2D(
             self._slider_track,
             0, self.ntracks - 1,
             value=self.track,
@@ -61,22 +74,16 @@ class TrackViewer:
 
         dataset = vedo.Volume(filename)
         arr = dataset.tonumpy(transpose=False)
-        self.volume  = vedo.Volume(arr[2::3])
-        # self.volspot = vedo.Volume(arr[1::3])
-        # self.volspot.zSlice(0).addScalarBar().show(new=True, q=1)
+        self.volume = vedo.Volume(arr[self.channel::3])
 
         dims = self.volume.dimensions()
-        self.nframes = int(dims[2] / 1)
+        self.nframes = int(dims[2] / 10)
 
-        rng = self.volume.scalarRange()
-        pb = vedo.ProgressBar(0, self.nframes, c="y")
-        for i in range(self.nframes):
-            s = self.volume.zSlice(i).lighting("off").cmap(self.cmap).z(-i)
-            s.cmap(self.cmap, vmin=rng[0], vmax=rng[1]*0.8)
-            self.slices.append(s)
-            pb.print("slicing")
+        if len(self.rng) == 0:
+            self.rng = self.volume.scalarRange()
+            self.rng[1] = self.rng[1]*0.8
 
-        self.slider1 = self.plt.at(1).addSlider2D(
+        self._slider1 = self.plt.at(1).addSlider2D(
             self._slider_time,
             0, self.nframes - 1,
             value=self.frame,
@@ -90,7 +97,7 @@ class TrackViewer:
         """Get point coords for a track"""
         track_df = self.dataframe.loc[self.dataframe["TRACK_ID"] == self.track]
         if len(track_df) == 0:
-            return None
+            return ()
         line_pts = np.c_[track_df["POSITION_X"], track_df["POSITION_Y"], track_df["FRAME"]]
         return line_pts
 
@@ -119,13 +126,20 @@ class TrackViewer:
             pt = pt[0]
         # print("point track",pt ," at frame", frame)
 
+        # this selects the single frame and the +1 is a trick that removes the NaNs
         frame_df = df.loc[(df["FRAME"] == frame) & df["TRACK_ID"]+1]
         tx,ty,tz = frame_df["POSITION_X"], frame_df["POSITION_Y"], frame_df["FRAME"]
         trackpts_at_frame = np.c_[tx,ty,tz]
         # print("frame_df", frame_df)
 
         spotid, trackid = frame_df["ID"], frame_df['TRACK_ID']
-        ids = np.c_[spotid, trackid].astype(int)
+        area, circ, sox9, finfo = (
+            frame_df["AREA"],
+            frame_df['CIRCULARITY'],
+            frame_df[self.sox9name],
+            frame_df[self.fieldname],
+        )
+        ids = np.c_[spotid, trackid, area, circ, sox9, finfo]
         # print("spotid, trackid", ids)
 
         vpts = vedo.Points(trackpts_at_frame)
@@ -135,17 +149,23 @@ class TrackViewer:
 
         trackpts_at_frame[:,2] = 0
         cpts = vedo.Points(trackpts_at_frame[cids], c='w')
-        labels = cpts.labels("id", c='white', justify='center').shift(0,0,1)
+        labels = cpts.labels("id", c=self.lcolor, justify='center', scale=self.lscale).shift(0,0,1)
         labels.name = "closest_info"
         self.plt.at(1).remove("closest_info").add(labels)
-        vedo.printc("-------------------------------------")
-        # vedo.printc(f"Track coords: {pt[:2].astype(int)}")
-        vedo.printc("Index,   spotID, trackID")
-        i=0
-        for a,b in ids[cids]:
-            vedo.printc(i, '\t', a, '\t', b)
-            i+=1
-        # vedo.show(vpts, labels, vedo.Point(pt), new=1, axes=1).close()
+
+        rtable = Table(title_justify='left')
+        rtable.add_column(header='Index', style="yellow", no_wrap=True)
+        rtable.add_column(header='spotID', style="yellow", no_wrap=True)
+        rtable.add_column(header='trackID', style="yellow", no_wrap=True)
+        rtable.add_column(header='Area', style="yellow", no_wrap=True)
+        rtable.add_column(header='Circularity', style="yellow", no_wrap=True)
+        rtable.add_column(header='SOX9', style="yellow", no_wrap=True)
+        rtable.add_column(header=self.fieldname, style="yellow", no_wrap=True)
+        for i, (a,b,c,d,e,f) in enumerate(ids[cids]):
+            d = vedo.utils.precision(d, 4)
+            rtable.add_row(str(i), str(int(a)), str(int(b)), str(int(c)), d, str(int(e)), str(f))
+        console = Console()
+        console.print(rtable, justify="center")
         return ids[cids]
 
     ######################################################
@@ -156,7 +176,9 @@ class TrackViewer:
         self.frame = min(self.frame, self.nframes - 1)
         self.frame = max(self.frame, 0)
 
-        slc1 = self.slices[self.frame]
+        slc1 = self.volume.zSlice(self.frame).lighting("off").z(-self.frame)
+        slc1.cmap(self.cmap, vmin=self.rng[0], vmax=self.rng[1])
+
         slc1.name = "slice1"
         slc0 = slc1.clone(transformed=1).z(self.frame).pickable(False)
         slc0.name = "slice0"
@@ -164,6 +186,8 @@ class TrackViewer:
         self.plt.at(1).remove("slice1").add(slc1, render=False)
 
         line_pts = self.getpoints()
+        if len(line_pts)==0:
+            return
         minframe, maxframe = np.min(line_pts[:, 2]), np.max(line_pts[:, 2])
         trackline = vedo.Line(line_pts, lw=3, c="orange5")
         trackline.name = "track"
@@ -179,8 +203,18 @@ class TrackViewer:
                 pt2d.name = "pt2d"
                 self.plt.add(pt2d, render=False)
 
-        self.slider1.GetRepresentation().SetValue(self.frame)
-        self.slider2.GetRepresentation().SetValue(self.track)
+        self._slider1.GetRepresentation().SetValue(self.frame)
+        self._slider2.GetRepresentation().SetValue(self.track)
+
+        df = self.dataframe
+        sox9level = df.loc[df["TRACK_ID"]==self.track][self.sox9name].to_numpy()
+        x = list(range(len(sox9level)))
+        self.plt.at(0).remove(self._cornerplot)
+        self._cornerplot = vedo.pyplot.CornerPlot([x, sox9level], pos='top-right', c='dg', lines=False)
+        self._cornerplot.GetXAxisActor2D().SetFontFactor(0.5)
+        self._cornerplot.GetYAxisActor2D().SetFontFactor(0.5)
+        self.plt.add(self._cornerplot, render=False)
+
         self.plt.render()
 
     ######################################################
@@ -189,7 +223,8 @@ class TrackViewer:
         self.update()
 
     def _slider_track(self, obj, _):
-        self.track = int(obj.GetRepresentation().GetValue())
+        value = int(obj.GetRepresentation().GetValue())
+        self.track = self.uniquetracks[value]
         self.update()
 
     ######################################################
@@ -255,6 +290,9 @@ class TrackViewer:
         s0 = self.volume.zSlice(0).lighting("off").cmap(self.cmap).alpha(0.2)
         s1 = self.volume.zSlice(self.nframes-1).lighting("off").cmap(self.cmap).alpha(0.2)
 
+        slc = self.volume.zSlice(self.frame).lighting("off").z(-self.frame)
+        slc.cmap(self.cmap, vmin=self.rng[0], vmax=self.rng[1])
+
         txt = vedo.Text2D(self.info, font="Calco", bg="yellow7")
 
         axes = vedo.Axes(
@@ -271,5 +309,5 @@ class TrackViewer:
             viewup=(-0.1758, 0.3662, 0.9138),
         )
         self.plt.at(0).show(s0, s1, axes, txt, camera=cam, bg2='light cyan')
-        self.plt.at(1).show(self.slices[self.frame], resetcam=True)
+        self.plt.at(1).show(slc, resetcam=True)
         self.plt.interactive().close()

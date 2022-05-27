@@ -1,2 +1,3 @@
 vedo
 pandas
+rich
