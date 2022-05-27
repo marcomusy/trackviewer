@@ -4,6 +4,8 @@ import vedo
 from rich.table import Table
 from rich.console import Console
 
+_version = 0.1
+
 ######################################################
 class TrackViewer:
     """Track viewer"""
@@ -13,6 +15,7 @@ class TrackViewer:
         self.cmap = "Greys_r"
         self.frame = 0  # init values
         self.track = 0
+        self.itrack = 0
         self.nframes = 0
         self.ntracks = 0
         self.dataframe = None
@@ -28,14 +31,21 @@ class TrackViewer:
         self.rng = ()
         self.uniquetracks = []
 
-        self.info = ("Press:\n"
-                    "- arrows to navigate\n"
-                    "- t to input track\n"
-                    "- r to reset camera\n"
-                    "- l to show track line\n"
-                    "- c to show closest ids\n"
-                    "- q to quit")
+        self.camera = dict(
+            pos=(1147, -1405, 1198),
+            focalPoint=(284.3, 254.2, 366.9),
+            viewup=(-0.1758, 0.3662, 0.9138),
+        )
 
+        self.info = (
+            "Press:\n"
+            "- arrows to navigate\n"
+            "- t to input track\n"
+            "- r to reset camera\n"
+            "- l to show track line\n"
+            "- c to show closest ids\n"
+            "- q to quit"
+        )
         self._slider1 = None
         self._slider2 = None
         self._cornerplot = None
@@ -43,7 +53,7 @@ class TrackViewer:
         vedo.settings.enableDefaultMouseCallbacks = False
         vedo.settings.enableDefaultKeyboardCallbacks = False
 
-        self.plt = vedo.Plotter(N=2, sharecam=False, title="Track Viewer", size=(2200,1100))
+        self.plt = vedo.Plotter(N=2, sharecam=False, title=f"Track Viewer v{_version}", size=(2200,1100))
         self._callback1 = self.plt.addCallback("click mouse", self.on_click)
         self._callback2 = self.plt.addCallback("key press", self.on_keypress)
 
@@ -51,33 +61,35 @@ class TrackViewer:
     ######################################################
     def loadTracks(self, filename):
         """Load the track data from a cvs file"""
-        vedo.printc("Loading track data from", filename, c="y")
+        vedo.printc("Loading track data from", filename, c="y", end='')
         self.dataframe = pandas.read_csv(filename, skip_blank_lines=True, skiprows=self.skiprows)
 
-        self.ntracks = int(max(self.dataframe["TRACK_ID"]))
-        # self.uniquetracks = np.unique(self.dataframe["TRACK_ID"].to_numpy())
-        # self.ntracks = len(self.uniquetracks)
+        self.uniquetracks = np.unique(self.dataframe["TRACK_ID"].to_numpy())
+        self.ntracks = len(self.uniquetracks)
+        vedo.printc(f"  (found {self.ntracks} tracks)", c="y")
 
         self._slider2 = self.plt.at(1).addSlider2D(
             self._slider_track,
-            0, self.ntracks - 1,
-            value=self.track,
-            pos=([0.1, 0.92], [0.4, 0.92]),
+            0,  self.ntracks - 1,
+            value=self.itrack,
+            pos=([0.05, 0.94], [0.45, 0.94]),
             title="track id",
+            showValue=False,
             c='blue3',
         )
 
     ######################################################
     def loadVolume(self, filename):
         """Load the 3-channel tif stack"""
-        vedo.printc("Loading volumetric dataset", filename, c="y")
+        vedo.printc("Loading volumetric dataset", filename, c="y", end='')
 
         dataset = vedo.Volume(filename)
         arr = dataset.tonumpy(transpose=False)
         self.volume = vedo.Volume(arr[self.channel::3])
 
         dims = self.volume.dimensions()
-        self.nframes = int(dims[2] / 10)
+        self.nframes = int(dims[2])
+        vedo.printc(f"  (found {self.nframes} frames)", c="y")
 
         if len(self.rng) == 0:
             self.rng = self.volume.scalarRange()
@@ -87,7 +99,7 @@ class TrackViewer:
             self._slider_time,
             0, self.nframes - 1,
             value=self.frame,
-            pos=([0.1, 0.08], [0.4, 0.08]),
+            pos=([0.05, 0.06], [0.45, 0.06]),
             title="frame nr. (time)",
             c='orange3',
         )
@@ -171,8 +183,8 @@ class TrackViewer:
     ######################################################
     def update(self):
         """Update visualization"""
-        self.track = min(self.track, self.ntracks - 1)
-        self.track = max(self.track, 0)
+        self.track = min(self.track, max(self.uniquetracks))
+        self.track = max(self.track, min(self.uniquetracks))
         self.frame = min(self.frame, self.nframes - 1)
         self.frame = max(self.frame, 0)
 
@@ -194,7 +206,7 @@ class TrackViewer:
         trackline.cmap('autumn_r', self.getvelocity(), vmin=0, vmax=self.maxvelocity)
         self.plt.at(0).remove("track").add(trackline, render=False)
 
-        self.plt.at(1).remove(["pt2d", "track2d", "closest_info"])
+        self.plt.at(1).remove("pt2d", "track2d", "closest_info")
         if minframe <= self.frame <= maxframe:
             res = np.where(line_pts[:, 2] == self.frame)[0]
             if len(res):  # some frames might be missing
@@ -204,7 +216,7 @@ class TrackViewer:
                 self.plt.add(pt2d, render=False)
 
         self._slider1.GetRepresentation().SetValue(self.frame)
-        self._slider2.GetRepresentation().SetValue(self.track)
+        self._slider2.GetRepresentation().SetTitleText(f"track id {self.track}")
 
         df = self.dataframe
         sox9level = df.loc[df["TRACK_ID"]==self.track][self.sox9name].to_numpy()
@@ -223,8 +235,9 @@ class TrackViewer:
         self.update()
 
     def _slider_track(self, obj, _):
-        value = int(obj.GetRepresentation().GetValue())
-        self.track = self.uniquetracks[value]
+        self.itrack = int(obj.GetRepresentation().GetValue())
+        self.track = self.uniquetracks[self.itrack]
+        obj.GetRepresentation().SetTitleText(f"track id {self.track}")
         self.update()
 
     ######################################################
@@ -248,14 +261,18 @@ class TrackViewer:
                 pass
 
         elif evt.keyPressed == "Up":
-            self.track += 1
+            self.itrack += 1
+            self.track = self.uniquetracks[self.itrack]
             line_pts = self.getpoints()
             self.frame = int(np.min(line_pts[:, 2]))
+            self._slider2.GetRepresentation().SetValue(self.itrack)
 
         elif evt.keyPressed == "Down":
-            self.track -= 1
+            self.itrack -= 1
+            self.track = self.uniquetracks[self.itrack]
             line_pts = self.getpoints()
             self.frame = int(np.min(line_pts[:, 2]))
+            self._slider2.GetRepresentation().SetValue(self.itrack)
 
         elif evt.keyPressed == "Right":
             self.frame += 1
@@ -287,9 +304,6 @@ class TrackViewer:
     ######################################################
     def start(self):
 
-        s0 = self.volume.zSlice(0).lighting("off").cmap(self.cmap).alpha(0.2)
-        s1 = self.volume.zSlice(self.nframes-1).lighting("off").cmap(self.cmap).alpha(0.2)
-
         slc = self.volume.zSlice(self.frame).lighting("off").z(-self.frame)
         slc.cmap(self.cmap, vmin=self.rng[0], vmax=self.rng[1])
 
@@ -300,14 +314,9 @@ class TrackViewer:
             xtitle="x /pixel",
             ytitle="y /pixel",
             ztitle="frame nr.",
-            xyGrid=False,
         )
 
-        cam = dict(
-            pos=(999.2, -1247, 991.1),
-            focalPoint=(227.6, 236.1, 248.5),
-            viewup=(-0.1758, 0.3662, 0.9138),
-        )
-        self.plt.at(0).show(s0, s1, axes, txt, camera=cam, bg2='light cyan')
-        self.plt.at(1).show(slc, resetcam=True)
+        self.plt.at(0).show(axes, txt, camera=self.camera, bg2='light cyan')
+        self.plt.at(1).show(slc, resetcam=True, zoom=1.1)
+        self.update()
         self.plt.interactive().close()
