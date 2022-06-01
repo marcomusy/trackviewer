@@ -21,7 +21,6 @@ tv = TrackViewer()
 tv.channel = 2
 tv.sox9name = "MEAN_INTENSITY_CH3"
 tv.nclosest = 10
-tv.maxvelocity = 10
 tv.lscale = 6   # size of labels
 
 # Load the data

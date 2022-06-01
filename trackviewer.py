@@ -13,14 +13,14 @@ class TrackViewer:
     def __init__(self):
 
         self.cmap = "Greys_r"
-        self.frame = 0  # init values
-        self.track = 0  # current track number
-        self.itrack = 0  # track nr selected by slider
-        self.nframes = 0  # total number of time frames
-        self.ntracks = 0  # total nr of tracks
-        self.dataframe = None  # the pandas dataframe
-        self.volume = None   # the vedo Volume object
-        self.maxvelocity = 20 # a saturation value for velocity coloring
+        self.frame = 0            # init values
+        self.track = 0            # current track number
+        self.itrack = 0           # track nr selected by slider
+        self.nframes = 0          # total number of time frames
+        self.ntracks = 0          # total nr of tracks
+        self.dataframe = None     # the pandas dataframe
+        self.volume = None        # the vedo Volume object
+        self.maxvelocity = 10     # a saturation value for velocity coloring
         self.nclosest = 10        # max nr of tracks positions to visualize
         self.skiprows = (1,2,3)   # skip these rows in the csv file
         self.channel = 2          # the tif channel we want to see as slices
