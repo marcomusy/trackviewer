@@ -7,9 +7,6 @@ from vedo.io import download
 csv_path = download("https://vedo.embl.es/examples/data/sox9_tracks_test.csv.gz")
 tif_path = download("https://vedo.embl.es/examples/data/sox9_labels_test.tif")
 
-# csv_path = "data/all_spots.csv"
-# tif_path = "data/Composite_downsized_sox9_labels_membrane.tif"
-
 # csv_path = "data/72h_spots.csv"
 # tif_path = "data/72h_masks_sox9_mem.tif"
 ########################################################################################

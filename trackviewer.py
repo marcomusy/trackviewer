@@ -43,11 +43,11 @@ class TrackViewer:
         self.info = (
             "Press:\n"
             "- arrows to navigate\n"
-            "- t to input track\n"
-            "- r to reset camera\n"
             "- l to show track line\n"
             "- c to show closest ids\n"
             "- x to jump to track\n"
+            "- t to input track\n"
+            "- r to reset camera\n"
             "- q to quit"
         )
         self._slider1 = None
@@ -208,15 +208,17 @@ class TrackViewer:
         line_pts = self.getpoints()
         if len(line_pts)==0:
             return
-        minframe, maxframe = np.min(line_pts[:, 2]).astype(int), np.max(line_pts[:, 2]).astype(int)
+        frames = line_pts[:, 2]
+        minframe, maxframe = np.min(frames).astype(int), np.max(frames).astype(int)
         trackline = vedo.Line(line_pts, lw=3, c="orange5")
         trackline.name = "track"
         trackline.cmap('autumn_r', self.getvelocity(), vmin=0, vmax=self.maxvelocity)
         self.plotter.at(0).remove("track").add(trackline, render=False)
 
         self.plotter.at(1).remove("pt2d", "track2d", "closest_info")
+        pt2d = None
         if minframe <= self.frame <= maxframe:
-            res = np.where(line_pts[:, 2] == self.frame)[0]
+            res = np.where(frames == self.frame)[0]
             if len(res):  # some frames might be missing
                 pt2d = vedo.Point(line_pts[res[0]], c="red6", r=10).z(0)
                 pt2d.pickable(False).useBounds(False)
@@ -227,11 +229,11 @@ class TrackViewer:
         self._slider2.GetRepresentation().SetTitleText(f"track id {self.track}")
 
         sox9level = self.dataframe.loc[self.dataframe["TRACK_ID"]==self.track][self.sox9name].to_numpy()
-        x = list(range(minframe, minframe + len(sox9level)))
 
-        sox9plot = vedo.pyplot.plot(x, sox9level, 'o', title=self.sox9name.replace("_","-"))
-        if -1 < self.frame - minframe < len(sox9level):
-            sox9plot += vedo.Point([self.frame, sox9level[self.frame-minframe]], r=9, c='red6')
+        sox9plot = vedo.pyplot.plot(frames, sox9level, 'o', title=self.sox9name.replace("_","-"))
+
+        if pt2d is not None:  # some frames might be missing
+            sox9plot += vedo.Point([self.frame, sox9level[res]], r=9, c='red6')
         self.plotter.at(2).remove("PlotXY").add(sox9plot, render=False).resetCamera(tight=0.05)
 
         self.plotter.render()
