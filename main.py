@@ -18,7 +18,7 @@ tv = TrackViewer()
 tv.channel = 2
 tv.sox9name = "MEAN_INTENSITY_CH3"
 tv.nclosest = 10
-tv.lscale = 6   # size of labels
+tv.yrange = [110,160]
 
 # Load the data
 tv.loadTracks(csv_path)

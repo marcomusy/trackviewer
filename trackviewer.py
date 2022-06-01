@@ -1,10 +1,23 @@
+"""Press:
+- arrows to navigate
+    left/right to change frame
+    up / down  to change track
+- drag mouse to rotate the scene in the left panel
+- right-click and drag to zoom in and out
+- left-click in right panel to show closest tracks
+- l to show track line
+- c to show closest ids
+- x to jump to the closest track
+- t to manually input a track id in terminal
+- r to reset camera
+- q to quit"""
 import numpy as np
 import pandas
 from rich.table import Table
 from rich.console import Console
 import vedo
 
-version = 0.3
+version = 0.4
 
 ######################################################
 class TrackViewer:
@@ -12,8 +25,8 @@ class TrackViewer:
 
     def __init__(self):
 
-        self.cmap = "Greys_r"
-        self.frame = 0            # init values
+        self.cmap = "Greys_r"     # color mapping of the volume slices
+        self.frame = 0            # current frame number
         self.track = 0            # current track number
         self.itrack = 0           # track nr selected by slider
         self.nframes = 0          # total number of time frames
@@ -26,13 +39,15 @@ class TrackViewer:
         self.channel = 2          # the tif channel we want to see as slices
         self.nchannels = 3        # total nr of channels in the tif stack
         self.lcolor = 'white'     # color of the labels when clicking
-        self.lscale = 4           # size of the labels
+        self.lscale = 6           # size of the labels
         self.fieldname = 'RADIUS' # the variable name to be shown in the terminal table
         self.sox9name = 'MEAN_INTENSITY_CH1'  # field name where the sox9 info is held
         self.range = ()           # scalar range of the sox9 expression (automatic)
+        self.yrange = (None,None) # y plot range, None=automatic
 
         self.uniquetracks = []
         self.closer_trackid = None
+        self.text2d = None
 
         self.camera = dict(
             pos=(1147, -1405, 1198),
@@ -40,26 +55,13 @@ class TrackViewer:
             viewup=(-0.1758, 0.3662, 0.9138),
         )
 
-        self.info = (
-            "Press:\n"
-            "- arrows to navigate\n"
-            "- l to show track line\n"
-            "- c to show closest ids\n"
-            "- x to jump to track\n"
-            "- t to input track\n"
-            "- r to reset camera\n"
-            "- q to quit"
-        )
-        self._slider1 = None
-        self._slider2 = None
-
         vedo.settings.enableDefaultMouseCallbacks = False
         vedo.settings.enableDefaultKeyboardCallbacks = False
 
         custom_shape = [
-            dict(bottomleft=(0  ,0), topright=(0.5,1), bg='white', bg2='lightcyan'), # renderer0
-            dict(bottomleft=(0.5,0), topright=(1.0,1), bg='white'),             # renderer1
-            dict(bottomleft=(0.325,0.75), topright=(0.495,0.98), bg='k9'),      # renderer2
+            dict(bottomleft=(0  ,0), topright=(0.5,1), bg='white', bg2='lightcyan'), # renderer0 (3d)
+            dict(bottomleft=(0.5,0), topright=(1.0,1), bg='white'),             # renderer1 (2d scene)
+            dict(bottomleft=(0.29,0.76), topright=(0.498,0.998), bg='k9'),      # renderer2 (plot)
         ]
         self.plotter = vedo.Plotter(
             shape=custom_shape, sharecam=False, title=f"Track Viewer v{version}", size=(2200,1100),
@@ -67,6 +69,8 @@ class TrackViewer:
 
         self._callback1 = self.plotter.addCallback("click mouse", self.on_click)
         self._callback2 = self.plotter.addCallback("key press", self.on_keypress)
+        self._slider1 = None
+        self._slider2 = None
 
 
     ######################################################
@@ -212,7 +216,8 @@ class TrackViewer:
         minframe, maxframe = np.min(frames).astype(int), np.max(frames).astype(int)
         trackline = vedo.Line(line_pts, lw=3, c="orange5")
         trackline.name = "track"
-        trackline.cmap('autumn_r', self.getvelocity(), vmin=0, vmax=self.maxvelocity)
+        vel = self.getvelocity()
+        trackline.cmap('autumn_r', vel, vmin=0, vmax=self.maxvelocity)
         self.plotter.at(0).remove("track").add(trackline, render=False)
 
         self.plotter.at(1).remove("pt2d", "track2d", "closest_info")
@@ -229,13 +234,15 @@ class TrackViewer:
         self._slider2.GetRepresentation().SetTitleText(f"track id {self.track}")
 
         sox9level = self.dataframe.loc[self.dataframe["TRACK_ID"]==self.track][self.sox9name].to_numpy()
-
-        sox9plot = vedo.pyplot.plot(frames, sox9level, 'o', title=self.sox9name.replace("_","-"))
+        title = self.sox9name.replace("_","-")
+        sox9plot = vedo.pyplot.plot(frames, sox9level, 'o', ylim=self.yrange, title=title, aspect=16/9)
+        sox9plot+= vedo.Line(np.c_[np.array(frames), vel+sox9plot.ylim[0]-1], c='tomato', lw=2)
 
         if pt2d is not None:  # some frames might be missing
             sox9plot += vedo.Point([self.frame, sox9level[res]], r=9, c='red6')
         self.plotter.at(2).remove("PlotXY").add(sox9plot, render=False).resetCamera(tight=0.05)
 
+        self.text2d.text("Press h for help")
         self.plotter.render()
 
     ######################################################
@@ -321,6 +328,11 @@ class TrackViewer:
             )
             self.plotter.at(1).show(camera=cam)
 
+        elif evt.keyPressed == "h":
+            self.text2d.text(__doc__)
+            self.plotter.render()
+            return
+
         elif evt.keyPressed == "q":
             self.plotter.close()
             return
@@ -332,16 +344,11 @@ class TrackViewer:
         slc = self.volume.zSlice(self.frame).lighting("off").z(-self.frame)
         slc.cmap(self.cmap, vmin=self.range[0], vmax=self.range[1])
 
-        txt = vedo.Text2D(self.info, font="Calco", bg="yellow7")
+        self.text2d = vedo.Text2D("Press h for help", font="Calco", bg="yellow9", alpha=1)
 
-        axes = vedo.Axes(
-            self.volume,
-            xtitle="x /pixel",
-            ytitle="y /pixel",
-            ztitle="frame nr.",
-        )
+        axes = vedo.Axes(self.volume, xtitle="x /pixel", ytitle="y /pixel", ztitle="frame nr.")
 
-        self.plotter.at(0).show(axes, txt, camera=self.camera, bg2='light cyan')
+        self.plotter.at(0).show(axes, self.text2d, camera=self.camera, bg2='light cyan')
         self.plotter.at(1).show(slc, resetcam=True, zoom=1.1)
         self.update()
         self.plotter.interactive().close()

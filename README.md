@@ -37,3 +37,5 @@ While in the application press:
 - r to reset camera
 - q to quit
 ```
+
+The red line in the plot represents the velocity of the cell.
