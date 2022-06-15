@@ -17,18 +17,26 @@ tv.nchannels = 3
 
 # Customize the viewer
 tv.channel = 2
-tv.sox9name = "MEAN_INTENSITY_CH2"
 tv.nclosest = 5
+tv.monitor = "MEAN_INTENSITY_CH2"
 tv.yrange = [90, 130]
 
 # Load the data
 tv.loadTracks(csv_path)
 tv.loadVolume(tif_path)
 
-# Start the application
-tv.start(interactive=False)
+# Start the application, interactive usage
+tv.start(interactive=True)
 
-tv.splitTrack(13, frame=15)
-tv.joinTracks(13, 23116)
+# Programmatic usage
+# tv.start(interactive=False)
 
-tv.plotter.interactive().close()
+# newid = tv.splitTrack(13, frame=15)
+# tv.joinTracks(13, newid)
+
+# tv.splitTrack(13834, frame=404)
+# tv.joinTracks(13834, 15570) # this will give error
+
+# tv.write("test.csv")
+
+# tv.plotter.interactive().close()
