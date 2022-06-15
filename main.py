@@ -3,12 +3,12 @@
 from trackviewer import TrackViewer
 
 # Data ##################################################################################
-# from vedo.io import download
-# csv_path = download("https://vedo.embl.es/examples/data/sox9_tracks_test.csv.gz")
-# tif_path = download("https://vedo.embl.es/examples/data/sox9_labels_test.tif")
+from vedo.io import download
+csv_path = download("https://vedo.embl.es/examples/data/sox9_tracks_test.csv.gz")
+tif_path = download("https://vedo.embl.es/examples/data/sox9_labels_test.tif")
 
-csv_path = "data/72h_spots.csv"
-tif_path = "data/72h_masks_sox9_mem.tif"
+# csv_path = "data/72h_spots.csv"
+# tif_path = "data/72h_masks_sox9_mem.tif"
 ########################################################################################
 
 # Create the viewer
@@ -26,10 +26,9 @@ tv.loadTracks(csv_path)
 tv.loadVolume(tif_path)
 
 # Start the application, interactive usage
-tv.start(interactive=True)
+tv.start(interactive=False)
 
 # Programmatic usage
-# tv.start(interactive=False)
 
 # newid = tv.splitTrack(13, frame=15)
 # tv.joinTracks(13, newid)
@@ -39,4 +38,4 @@ tv.start(interactive=True)
 
 # tv.write("test.csv")
 
-# tv.plotter.interactive().close()
+tv.plotter.interactive().close()

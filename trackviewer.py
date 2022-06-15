@@ -210,12 +210,12 @@ class TrackViewer:
         trackpts_at_frame[:,2] = 0
         cpts = vedo.Points(trackpts_at_frame[cids], c='w')
         labels1 = cpts.labels("id", c=self.lcolor, justify='center', scale=self.lscale).shift(0,0,1)
-        labels1.name = "xxx"
-        labels0 = labels1.clone(deep=1).z(self.frame + 0.1).pickable(False)
-        labels0.name = "yyy"
+        labels1.name = "labels1"
+        labels0 = labels1.clone(deep=False).z(self.frame + 0.1).pickable(False)
+        labels0.name = "labels0"
 
-        self.plotter.at(0).remove("yyy").add(labels0, render=False)
-        self.plotter.at(1).remove("xxx").add(labels1, render=False)
+        self.plotter.at(0).remove("labels0").add(labels0, render=False)
+        self.plotter.at(1).remove("labels1").add(labels1, render=False)
 
         self.plotter.render()
 
@@ -260,12 +260,12 @@ class TrackViewer:
         trackline.name = "track"
         vel = self.getVelocity()
         trackline.cmap("autumn_r", vel, vmin=0, vmax=self.maxvelocity)
-        self.plotter.at(0).remove("track").add(trackline, render=False)
+        self.plotter.at(0).remove("track", "labels0").add(trackline, render=False)
 
         for row in range(self.nclosest):
             self.plotter.remove("closeby_trk")
 
-        self.plotter.at(1).remove("pt2d", "track2d", "closest_info")
+        self.plotter.at(1).remove("pt2d", "track2d", "labels1")
         pt2d = None
         if minframe <= self.frame <= maxframe:
             res = np.where(frames == self.frame)[0]
@@ -275,14 +275,14 @@ class TrackViewer:
                 pt2d.name = "pt2d"
                 self.plotter.add(pt2d, render=False)
 
-        sox9level = self.dataframe.loc[self.dataframe["TRACK_ID"]==self.track][self.monitor].to_numpy()
+        level = self.dataframe.loc[self.dataframe["TRACK_ID"]==self.track][self.monitor].to_numpy()
         title = self.monitor.replace("_","-")
-        sox9plot = vedo.pyplot.plot(frames, sox9level, 'o', ylim=self.yrange, title=title, aspect=16/9)
-        sox9plot+= vedo.Line(np.c_[np.array(frames), vel+sox9plot.ylim[0]-1], c='tomato', lw=2)
+        mplot = vedo.pyplot.plot(frames, level, 'o', ylim=self.yrange, title=title, aspect=16/9)
+        mplot+= vedo.Line(np.c_[np.array(frames), vel+mplot.ylim[0]-1], c='tomato', lw=2)
 
         if pt2d is not None:  # some frames might be missing
-            sox9plot += vedo.Point([self.frame, sox9level[res]], r=9, c='red6')
-        self.plotter.at(2).remove("PlotXY").add(sox9plot, render=False).resetCamera(tight=0.05)
+            mplot += vedo.Point([self.frame, level[res]], r=9, c='red6')
+        self.plotter.at(2).remove("PlotXY").add(mplot, render=False).resetCamera(tight=0.05)
 
         self.text2d.text("Press h for help")
         self._slider1.GetRepresentation().SetValue(self.frame)
@@ -423,7 +423,7 @@ class TrackViewer:
         z1 = self.getPoints(track2)[:, 2]
 
         # Sanity checks
-        tt = " is overlapping with current track. Skip."
+        tt = f" is overlapping with current track {track1}. Skip."
         if z0[0] < z1[0] < z0[-1]:
             vedo.printc(f"ERROR: start frame of track {track2} {tt}", c='r', invert=True)
             return
@@ -452,21 +452,21 @@ class TrackViewer:
             frame = self.frame
         df = self.dataframe
         mask = (df["TRACK_ID"] == trid) & (df["FRAME"] >= frame)
-        maxid = df["TRACK_ID"].max()
-        df["TRACK_ID"] = np.where(mask, maxid + 1, df["TRACK_ID"])
-        vedo.printc("..created new track with ID", maxid + 1, c="g", invert=True)
+        newid = df["TRACK_ID"].max() + 1
+        df["TRACK_ID"] = np.where(mask, newid, df["TRACK_ID"])
+        vedo.printc("..created new track with ID", newid, c="g", invert=True)
         self.uniquetracks = np.unique(df["TRACK_ID"].to_numpy()).astype(int)
         self.ntracks = len(self.uniquetracks)
         self._slider2.GetRepresentation().SetMaximumValue(self.ntracks - 1)
         self.update()
-        return maxid + 1
+        return newid
 
     ######################################################
     def write(self, filename="new_spots.csv"):
         """Write to file the current dataframe for the (edited) tracks"""
-        vedo.printc(f"Writing tracks to {filename} (this will take time)...", end="")
+        vedo.printc(f"Writing tracks to {filename} (this will take time)...", end="", invert=True)
         self.dataframe.to_csv(filename)
-        vedo.printc(" done", invert=True)
+        vedo.printc(" done!", invert=True)
 
     ######################################################
     def start(self, interactive=True):
