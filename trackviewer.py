@@ -9,11 +9,11 @@
 - drag mouse to rotate the scene in the left panel
 - right-click and drag to zoom in and out
 - click in right panel to show closest tracks
-- 1-9 to change volume channel
+- 1-9 (on keypad) to change volume channel
 - l to show track line
 - c to show closest ids
 - x to jump to the closest track
-- t to manually input a track id in terminal
+- t to manually input a track id
 - J to join the current track to a specified one
 - S to split the current track in half
 - W to write the edited track to disk
@@ -59,6 +59,10 @@ class TrackViewer:
         self.text2d = None
         self.volumes = [None] * self.nchannels
         self.filename = ""
+
+        self.input_mode = False
+        self.input_text2d = None
+        self.input_data = ""
 
         self.camera = dict(
             pos=(1147, -1405, 1198),
@@ -311,16 +315,44 @@ class TrackViewer:
     ######################################################
     def _on_keypress(self, evt):
         """Press keys to perform some action"""
+
+        #------------------------------------------------
+        if self.input_mode:
+            if evt.keyPressed == "Return":
+                self.input_mode = False
+                try:
+                    self.track = int(self.input_data)
+                    line_pts = self.getPoints()
+                    if len(line_pts) == 0:
+                        vedo.printc("no points for this track!", c="r")
+                        self.input_text2d.text('')
+                        self.plotter.render()
+                        return
+                    self.frame = int(np.min(line_pts[:, 2]))
+                except ValueError:
+                    pass
+                self.input_text2d.text('')
+                self.update()
+                return
+
+            if evt.keyPressed == "BackSpace" and self.input_data:
+                self.input_data = self.input_data[:-1]
+                evt.keyPressed = ''
+
+            self.input_data += evt.keyPressed
+            self.input_text2d.text("Jump to TrackID: "+self.input_data)
+            self.plotter.render()
+            return
+        #------------------------------------------------
+
         if evt.keyPressed == "t":
-            try:
-                self.track = int(vedo.io.ask("Input track ID to jump to:", c="y"))
-                line_pts = self.getPoints()
-                if len(line_pts) == 0:
-                    vedo.printc("no points for this track!", c="r")
-                    return
-                self.frame = int(np.min(line_pts[:, 2]))
-            except ValueError:
-                pass
+            self.input_mode = True
+            self.input_data = ""
+            self.input_text2d.text("Jump to TrackID: "+self.input_data)
+
+        elif evt.keyPressed == "u":
+            self.input_mode=True
+            self.input_text2d.text(evt.keyPressed)
 
         elif evt.keyPressed == "Up":
             self.itrack += 1
@@ -369,8 +401,10 @@ class TrackViewer:
             self.getClosest()
             return
 
-        elif evt.keyPressed.isdigit():
-            self.channel = int(evt.keyPressed)
+        elif "KP_" in evt.keyPressed:
+            kp = evt.keyPressed.replace("KP_","").replace("End","1").replace("Down","2")
+            kp = kp.replace("Next","3")
+            self.channel = int(kp)
             self.loadVolume()
 
         elif evt.keyPressed == "r":
@@ -397,11 +431,8 @@ class TrackViewer:
             return
 
         elif evt.keyPressed == "S":
-            res = vedo.io.ask(f"Split track {self.track}?",
-                              options=['Y','n'], default='Y', c='g', invert=True)
             try:
-                if res == "Y":
-                    self.splitTrack(self.track)
+                self.splitTrack(self.track)
             except ValueError:
                 vedo.printc(f"Could not split track {self.track}. Skipped.")
             return
@@ -475,10 +506,11 @@ class TrackViewer:
         slc.cmap(self.cmap, vmin=self.range[0], vmax=self.range[1])
 
         self.text2d = vedo.Text2D("Press h for help", font="Calco", bg="yellow9", alpha=1)
+        self.input_text2d = vedo.Text2D(font="Calco", c='w', bg="blue3", alpha=1, pos='bottom-left', s=1.3)
 
         axes = vedo.Axes(self.volume, xtitle="x /pixel", ytitle="y /pixel", ztitle="frame nr.")
 
-        self.plotter.at(0).show(axes, self.text2d, camera=self.camera, bg2="light cyan")
+        self.plotter.at(0).show(axes, self.text2d, self.input_text2d, camera=self.camera, bg2="light cyan")
         self.plotter.at(1).show(slc, resetcam=True, zoom=1.1)
         self.update()
         if interactive:
