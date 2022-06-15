@@ -38,4 +38,3 @@ While in the application press:
 - q to quit
 ```
 
-The red line in the plot represents the velocity of the cell.
