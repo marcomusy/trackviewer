@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # https://github.com/marcomusy/trackviewer
-# Created on Wed Jun 15 17:45:55 2022
+# Created on Wed Jun 10 17:45:55 2022
 # @author: musy
+
 """Press:
 - arrows to navigate
     left/right to change frame
@@ -62,7 +63,7 @@ class TrackViewer:
 
         self.input_mode = False
         self.input_text2d = None
-        self.input_data = ""
+        self.input_string = ""
 
         self.camera = dict(
             pos=(1147, -1405, 1198),
@@ -219,9 +220,7 @@ class TrackViewer:
         labels0.name = "labels0"
 
         self.plotter.at(0).remove("labels0").add(labels0, render=False)
-        self.plotter.at(1).remove("labels1").add(labels1, render=False)
-
-        self.plotter.render()
+        self.plotter.at(1).remove("labels1").add(labels1)
 
         rtable = Table(title_justify="left")
         rtable.add_column(header="Index", style="yellow", no_wrap=True)
@@ -313,48 +312,52 @@ class TrackViewer:
         self.getClosest(pt)
 
     ######################################################
-    def _on_keypress(self, evt):
-        """Press keys to perform some action"""
-
-        #------------------------------------------------
-        if self.input_mode:
-            if evt.keyPressed == "Return":
+    def _interactive_keypress(self, key):
+            if key == "Return":
                 self.input_mode = False
-                try:
-                    self.track = int(self.input_data)
+                if self.input_string.isdigit():
+                    self.track = int(self.input_string)
                     line_pts = self.getPoints()
                     if len(line_pts) == 0:
-                        vedo.printc("no points for this track!", c="r")
-                        self.input_text2d.text('')
+                        self.input_text2d.text(f"Track {self.track} does not exist!")
                         self.plotter.render()
                         return
                     self.frame = int(np.min(line_pts[:, 2]))
-                except ValueError:
-                    pass
-                self.input_text2d.text('')
+                self.input_text2d.text("")
                 self.update()
-                return
 
-            if evt.keyPressed == "BackSpace" and self.input_data:
-                self.input_data = self.input_data[:-1]
-                evt.keyPressed = ''
+            elif key == "BackSpace":
+                if self.input_string:
+                    self.input_string = self.input_string[:-1]
+                    self.input_text2d.text("Jump to TrackID: " + self.input_string)
+                    self.plotter.render()
 
-            self.input_data += evt.keyPressed
-            self.input_text2d.text("Jump to TrackID: "+self.input_data)
-            self.plotter.render()
+            elif key.isdigit():
+                self.input_string += key
+                self.input_text2d.text("Jump to TrackID: " + self.input_string)
+                self.plotter.render()
+
+    def _on_keypress(self, evt):
+        """Press keys to perform some action"""
+        k = evt.keyPressed
+
+        #------------------------------------------------
+        if self.input_mode:
+            self._interactive_keypress(k)
             return
         #------------------------------------------------
 
-        if evt.keyPressed == "t":
+        if k == "t":
             self.input_mode = True
-            self.input_data = ""
-            self.input_text2d.text("Jump to TrackID: "+self.input_data)
+            self.input_string = ""
+            self.input_text2d.text("Jump to TrackID: " + self.input_string)
+            self.plotter.render()
 
-        elif evt.keyPressed == "u":
+        elif k == "u":
             self.input_mode=True
-            self.input_text2d.text(evt.keyPressed)
+            self.input_text2d.text(k)
 
-        elif evt.keyPressed == "Up":
+        elif k == "Up":
             self.itrack += 1
             if self.itrack >= self.ntracks:
                 self.itrack = self.ntracks - 1
@@ -364,7 +367,7 @@ class TrackViewer:
             self.frame = int(np.min(line_pts[:, 2]))
             self._slider2.GetRepresentation().SetValue(self.itrack)
 
-        elif evt.keyPressed == "Down":
+        elif k == "Down":
             self.itrack -= 1
             if self.itrack < 0:
                 self.itrack = 0
@@ -374,13 +377,13 @@ class TrackViewer:
             self.frame = int(np.min(line_pts[:, 2]))
             self._slider2.GetRepresentation().SetValue(self.itrack)
 
-        elif evt.keyPressed == "Right":
+        elif k == "Right":
             self.frame += 1
 
-        elif evt.keyPressed == "Left":
+        elif k == "Left":
             self.frame -= 1
 
-        elif evt.keyPressed == "l":
+        elif k == "l":
             line_pts = self.getPoints()
             if line_pts is None:
                 return
@@ -389,7 +392,7 @@ class TrackViewer:
             self.plotter.at(1).remove("track2d").add(trackline2d)
             return
 
-        elif evt.keyPressed == "x":
+        elif k == "x":
             if self.closer_trackid is None:
                 vedo.printc("Please click a point or press c before x", c="r")
                 return
@@ -397,31 +400,33 @@ class TrackViewer:
             self.track = self.closer_trackid
             self.closer_trackid = None
 
-        elif evt.keyPressed == "c":
+        elif k == "c":
             self.getClosest()
             return
 
-        elif "KP_" in evt.keyPressed:
-            kp = evt.keyPressed.replace("KP_","").replace("End","1").replace("Down","2")
-            kp = kp.replace("Next","3")
-            self.channel = int(kp)
-            self.loadVolume()
+        elif "KP_" in k:
+            kp = k.replace("KP_","").replace("End","1").replace("Down","2")
+            kp = kp.replace("Next","3").replace("Left","4").replace("Begin","5")
+            if kp.isdigit():
+                self.channel = int(kp)
+                self.loadVolume()
 
-        elif evt.keyPressed == "r":
+        elif k == "r":
             dx, dy, _ = self.volume.dimensions()
             cam = dict(
                 pos=(dx/2, dy/2, (dx+dy)/2*3),
                 focalPoint=(dx/2, dy/2, 0),
                 viewup=(0, 1, 0),
             )
+            self.plotter.at(0).resetCamera()
             self.plotter.at(1).show(camera=cam)
 
-        elif evt.keyPressed == "h":
+        elif k == "h":
             self.text2d.text(__doc__)
             self.plotter.render()
             return
 
-        elif evt.keyPressed == "J":
+        elif k == "J":
             trid = vedo.io.ask(f"Insert the TRACKID to be joined to current track {self.track}",
                                c='g', invert=True)
             try:
@@ -430,18 +435,18 @@ class TrackViewer:
                 vedo.printc("Could not join tracks. Skipped.")
             return
 
-        elif evt.keyPressed == "S":
+        elif k == "S":
             try:
                 self.splitTrack(self.track)
             except ValueError:
                 vedo.printc(f"Could not split track {self.track}. Skipped.")
             return
 
-        elif evt.keyPressed == "W":
+        elif k == "W":
             self.write()
             return
 
-        elif evt.keyPressed == "q":
+        elif k == "q":
             self.plotter.interactor.ExitCallback()
             return
 

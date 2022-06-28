@@ -25,11 +25,10 @@ tv.yrange = [90, 130]
 tv.loadTracks(csv_path)
 tv.loadVolume(tif_path)
 
-# Start the application, interactive usage
+# Start the application, interactive usage:
 tv.start(interactive=False)
 
-# Programmatic usage
-
+# Programmatic usage:
 # newid = tv.splitTrack(13, frame=15)
 # tv.joinTracks(13, newid)
 
