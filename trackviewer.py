@@ -10,7 +10,7 @@
 - drag mouse to rotate the scene in the left panel
 - right-click and drag to zoom in and out
 - click in right panel to show closest tracks
-- 1-9 (on keypad) to change volume channel
+- 1-9 (on keypad) or + to change volume channel
 - l to show track line
 - c to show closest ids
 - x to jump to the closest track
@@ -27,7 +27,7 @@ from rich.table import Table
 from rich.console import Console
 import vedo
 
-version = 0.5
+version = 0.7
 
 ######################################################
 class TrackViewer:
@@ -87,6 +87,8 @@ class TrackViewer:
         self._callback2 = self.plotter.addCallback("key press", self._on_keypress)
         self._slider1 = None
         self._slider2 = None
+        self._slider1rep = None
+        self._slider2rep = None
 
 
     ######################################################
@@ -109,6 +111,7 @@ class TrackViewer:
             showValue=False,
             c="blue3",
         )
+        self._slider2rep = self._slider2.GetRepresentation()
 
     ######################################################
     def loadVolume(self, filename=""):
@@ -151,6 +154,7 @@ class TrackViewer:
                 title="frame number",
                 c="orange3",
             )
+            self._slider1rep = self._slider1.GetRepresentation()
 
     ######################################################
     def getPoints(self, track=None):
@@ -187,8 +191,7 @@ class TrackViewer:
                 return
             pt = pt[0]
 
-        # this selects the single frame and the +1 is a trick that removes the NaNs
-        frame_df = df.loc[(df["FRAME"] == frame) & df["TRACK_ID"] + 1]
+        frame_df = df.loc[df["FRAME"] == frame]
         tx, ty, tz = frame_df["POSITION_X"], frame_df["POSITION_Y"], frame_df["FRAME"]
         trackpts_at_frame = np.c_[tx, ty, tz]
 
@@ -208,9 +211,11 @@ class TrackViewer:
         for row in ids[cids]:
             self.plotter.at(0).remove("closeby_trk")
         for row in ids[cids]:
-            closeby_track = vedo.Line(self.getPoints(row[1]), c="indigo8")
-            closeby_track.name = "closeby_trk"
-            self.plotter.at(0).add(closeby_track, render=False)
+            tpts = self.getPoints(row[1])
+            if len(tpts):
+                closeby_track = vedo.Line(tpts, c="indigo8")
+                closeby_track.name = "closeby_trk"
+                self.plotter.at(0).add(closeby_track, render=False)
 
         trackpts_at_frame[:,2] = 0
         cpts = vedo.Points(trackpts_at_frame[cids], c='w')
@@ -231,8 +236,11 @@ class TrackViewer:
         rtable.add_column(header="SOX9", style="yellow", no_wrap=True)
         rtable.add_column(header=self.fieldname, style="yellow", no_wrap=True)
         for i, (a, b, c, d, e, f) in enumerate(ids[cids]):
-            d = vedo.utils.precision(d, 4)
-            rtable.add_row(str(i), str(int(a)), str(int(b)), str(int(c)), d, str(int(e)), str(f))
+            try:
+                d = vedo.utils.precision(d, 4)
+                rtable.add_row(str(i), str(int(a)), str(int(b)), str(int(c)), d, str(int(e)), str(f))
+            except ValueError:
+                pass
         console = Console()
         console.print(rtable)
         return ids[cids]
@@ -278,8 +286,11 @@ class TrackViewer:
                 pt2d.name = "pt2d"
                 self.plotter.add(pt2d, render=False)
 
+        dfm = self.dataframe.loc[(self.dataframe["FRAME"]>minframe) & (self.dataframe["FRAME"]<maxframe)]
+        mon_levels = dfm[self.monitor].to_numpy()
+
         level = self.dataframe.loc[self.dataframe["TRACK_ID"]==self.track][self.monitor].to_numpy()
-        title = self.monitor.replace("_","-")
+        title = self.monitor.replace("_","\_") + f" (ave: {round(mon_levels.mean(),1)})"
         mplot = vedo.pyplot.plot(frames, level, 'o', ylim=self.yrange, title=title, aspect=16/9)
         mplot+= vedo.Line(np.c_[np.array(frames), vel+mplot.ylim[0]-1], c='tomato', lw=2)
 
@@ -288,19 +299,19 @@ class TrackViewer:
         self.plotter.at(2).remove("PlotXY").add(mplot, render=False).resetCamera(tight=0.05)
 
         self.text2d.text("Press h for help")
-        self._slider1.GetRepresentation().SetValue(self.frame)
-        self._slider2.GetRepresentation().SetTitleText(f"track id {self.track}")
+        self._slider1rep.SetValue(self.frame)
+        self._slider2rep.SetTitleText(f"track id {self.track}")
         self.plotter.render()
 
     ######################################################
     def _slider_time(self, obj, _):
-        self.frame = int(obj.GetRepresentation().GetValue())
+        self.frame = int(self._slider1rep.GetValue())
         self.update()
 
     def _slider_track(self, obj, _):
-        self.itrack = int(obj.GetRepresentation().GetValue())
+        self.itrack = int(self._slider2rep.GetValue())
         self.track = self.uniquetracks[self.itrack]
-        obj.GetRepresentation().SetTitleText(f"track id {self.track}")
+        self._slider2rep.SetTitleText(f"track id {self.track}")
         self.update()
 
     ######################################################
@@ -365,7 +376,7 @@ class TrackViewer:
             self.track = self.uniquetracks[self.itrack]
             line_pts = self.getPoints()
             self.frame = int(np.min(line_pts[:, 2]))
-            self._slider2.GetRepresentation().SetValue(self.itrack)
+            self._slider2rep.SetValue(self.itrack)
 
         elif k == "Down":
             self.itrack -= 1
@@ -375,7 +386,7 @@ class TrackViewer:
             self.track = self.uniquetracks[self.itrack]
             line_pts = self.getPoints()
             self.frame = int(np.min(line_pts[:, 2]))
-            self._slider2.GetRepresentation().SetValue(self.itrack)
+            self._slider2rep.SetValue(self.itrack)
 
         elif k == "Right":
             self.frame += 1
@@ -410,6 +421,10 @@ class TrackViewer:
             if kp.isdigit():
                 self.channel = int(kp)
                 self.loadVolume()
+
+        elif "plus" in k:
+            self.channel = (self.channel + 1) % self.nchannels
+            self.loadVolume()
 
         elif k == "r":
             dx, dy, _ = self.volume.dimensions()
@@ -478,7 +493,7 @@ class TrackViewer:
         vedo.printc(f"..joined tracks IDs {track1} and {track2} to ID {track1}", c='g', invert=True)
         self.uniquetracks = np.unique(df["TRACK_ID"].to_numpy()).astype(int)
         self.ntracks = len(self.uniquetracks)
-        self._slider2.GetRepresentation().SetMaximumValue(self.ntracks - 1)
+        self._slider2rep.SetMaximumValue(self.ntracks - 1)
         self.update()
 
     ######################################################
@@ -493,7 +508,7 @@ class TrackViewer:
         vedo.printc("..created new track with ID", newid, c="g", invert=True)
         self.uniquetracks = np.unique(df["TRACK_ID"].to_numpy()).astype(int)
         self.ntracks = len(self.uniquetracks)
-        self._slider2.GetRepresentation().SetMaximumValue(self.ntracks - 1)
+        self._slider2rep.SetMaximumValue(self.ntracks - 1)
         self.update()
         return newid
 
