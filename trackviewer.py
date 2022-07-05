@@ -286,13 +286,19 @@ class TrackViewer:
                 pt2d.name = "pt2d"
                 self.plotter.add(pt2d, render=False)
 
-        dfm = self.dataframe.loc[(self.dataframe["FRAME"]>minframe) & (self.dataframe["FRAME"]<maxframe)]
-        mon_levels = dfm[self.monitor].to_numpy()
+        # work out the average level of the self.monitor variable over the whole frame
+        mframes, mon_levels = [], []
+        for fr in range(minframe, maxframe, 5):
+            mm = self.dataframe.loc[(self.dataframe["FRAME"]==fr)][self.monitor].mean()
+            mframes.append(fr)
+            mon_levels.append(mm)
 
         level = self.dataframe.loc[self.dataframe["TRACK_ID"]==self.track][self.monitor].to_numpy()
-        title = self.monitor.replace("_","\_") + f" (ave: {round(mon_levels.mean(),1)})"
+        title = self.monitor.replace("_","\_")
         mplot = vedo.pyplot.plot(frames, level, 'o', ylim=self.yrange, title=title, aspect=16/9)
         mplot+= vedo.Line(np.c_[np.array(frames), vel+mplot.ylim[0]-1], c='tomato', lw=2)
+        if len(mon_levels) > 2:
+            mplot+= vedo.Line(np.c_[np.array(mframes), np.array(mon_levels)], c='k4', lw=1)
 
         if pt2d is not None:  # some frames might be missing
             mplot += vedo.Point([self.frame, level[res]], r=9, c='red6')
