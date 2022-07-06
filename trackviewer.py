@@ -18,6 +18,7 @@
 - J to join the current track to a specified one
 - S to split the current track in half
 - W to write the edited track to disk
+- d/D to enable/disable drawing splines
 - r to reset camera
 - q to quit"""
 
@@ -27,7 +28,7 @@ from rich.table import Table
 from rich.console import Console
 import vedo
 
-version = 0.7
+version = 0.8
 
 ######################################################
 class TrackViewer:
@@ -65,6 +66,12 @@ class TrackViewer:
         self.input_text2d = None
         self.input_string = ""
 
+        self.draw_mode = False
+        self.spline = None
+        self.splines = []
+        self.spline_cpoints = []
+        self.spline_points = None
+
         self.camera = dict(
             pos=(1147, -1405, 1198),
             focalPoint=(284.3, 254.2, 366.9),
@@ -83,8 +90,9 @@ class TrackViewer:
             shape=custom_shape, sharecam=False, title=f"Track Viewer v{version}", size=(2200,1100),
         )
 
-        self._callback1 = self.plotter.addCallback("click mouse", self._on_click)
+        self._callback1 = self.plotter.addCallback("click mouse", self._on_left_click)
         self._callback2 = self.plotter.addCallback("key press", self._on_keypress)
+        self._callback3 = self.plotter.addCallback('RightButtonPress', self._on_right_click)
         self._slider1 = None
         self._slider2 = None
         self._slider1rep = None
@@ -321,12 +329,36 @@ class TrackViewer:
         self.update()
 
     ######################################################
-    def _on_click(self, evt):
+    def _update_spline(self, closed=0):
+        self.plotter.remove([self.spline, self.spline_points])  # remove old points and spline
+        self.spline_points = vedo.Points(self.spline_cpoints).ps(10).c('yellow4')
+        self.spline_points.pickable(False)  # avoid picking the same point
+        if len(self.spline_cpoints) > 2:
+            self.spline = vedo.Spline(self.spline_cpoints, closed=closed).c('yellow5').lw(3)
+            self.plotter.add(self.spline_points, self.spline)
+        else:
+            self.plotter.add(self.spline_points)
+
+    ######################################################
+    def _on_right_click(self, evt):
+        if self.draw_mode and evt.actor and len(self.spline_cpoints)>0:
+            self.spline_cpoints.pop() # pop removes from the list the last pt
+            self._update_spline()
+
+    ######################################################
+    def _on_left_click(self, evt):
         """Clicking on the right image will dump some info"""
         if not evt.actor:
             return
-        pt = np.array([evt.picked3d[0], evt.picked3d[1], self.frame])
-        self.getClosest(pt)
+
+        if self.draw_mode:
+            p = evt.picked3d + [0,0,1]
+            self.spline_cpoints.append(p)
+            self._update_spline()
+
+        else:
+            pt = np.array([evt.picked3d[0], evt.picked3d[1], self.frame])
+            self.getClosest(pt)
 
     ######################################################
     def _interactive_keypress(self, key):
@@ -439,6 +471,10 @@ class TrackViewer:
                 focalPoint=(dx/2, dy/2, 0),
                 viewup=(0, 1, 0),
             )
+            self.plotter.at(1).remove(self.splines)
+            self.spline_cpoints = []
+            self.splines = []
+            self.spline = None
             self.plotter.at(0).resetCamera()
             self.plotter.at(1).show(camera=cam)
 
@@ -467,6 +503,23 @@ class TrackViewer:
             self.write()
             return
 
+        elif k == "d":
+            self.draw_mode = True
+            self.plotter.at(1).add(self.splines)
+            vedo.printc("Spline drawing mode is now enabled", c='y', invert=True)
+            return
+
+        elif k == "D":
+            self._update_spline(closed=True)
+            self.draw_mode = False
+            self.spline_cpoints = []
+            if self.spline not in self.splines:
+                self.splines.append(self.spline)
+                self.spline = None
+            self.plotter.remove(self.spline_points).render()
+            vedo.printc("Spline drawing mode disabled", c='y', invert=True)
+            return
+
         elif k == "q":
             self.plotter.interactor.ExitCallback()
             return
@@ -490,9 +543,6 @@ class TrackViewer:
         if z1[0] <= z0[0] and z1[-1] >= z0[-1]:
             vedo.printc(f"ERROR: track you want to join {tt}", c="r", invert=True)
             return
-        # if z1[0] > z0[-1]+3 or z1[-1] < z0[0]-3:
-        #     vedo.printc(f"ERROR: track you want to join has large gap. Skip.", c='r', invert=True)
-        #     return
 
         df = self.dataframe
         df["TRACK_ID"] = np.where(df["TRACK_ID"] == track2, track1, df["TRACK_ID"])
