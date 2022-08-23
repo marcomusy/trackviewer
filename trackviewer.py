@@ -140,9 +140,9 @@ class TrackViewer:
             filename = self.filename
         vedo.printc(f"Loading volumetric dataset {filename}, channel-{self.channel}", c="y", end='')
         dataset = vedo.Volume(filename)
-        arr = dataset.tonumpy(transpose=False)
 
-        self.volume = vedo.Volume(arr[ch :: self.nchannels])
+        arr = dataset.tonumpy()
+        self.volume = vedo.Volume(arr[:, :, ch::self.nchannels])
         self.volumes[ch] = self.volume
 
         dims = self.volume.dimensions()
