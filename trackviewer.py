@@ -18,7 +18,9 @@
 - J to join the current track to a specified one
 - S to split the current track in half
 - W to write the edited track to disk
-- d/D to enable/disable drawing splines
+- o to enable/disable drawing a reference spline
+- O to find tracks in the (anti-clock-wise) spline
+- p to print current mouse coordinates (in pixels)
 - r to reset camera
 - q to quit"""
 
@@ -28,7 +30,7 @@ from rich.table import Table
 from rich.console import Console
 import vedo
 
-version = 0.8
+version = 0.9
 
 ######################################################
 class TrackViewer:
@@ -68,7 +70,6 @@ class TrackViewer:
 
         self.draw_mode = False
         self.spline = None
-        self.splines = []
         self.spline_cpoints = []
         self.spline_points = None
 
@@ -80,6 +81,8 @@ class TrackViewer:
 
         vedo.settings.enableDefaultMouseCallbacks = False
         vedo.settings.enableDefaultKeyboardCallbacks = False
+        vedo.settings.defaultFont = "Calco"
+        # vedo.settings.useDepthPeeling = False
 
         custom_shape = [
             dict(bottomleft=(0  ,0), topright=(0.5,1), bg='white', bg2='lightcyan'), # renderer0 (3d)
@@ -93,10 +96,8 @@ class TrackViewer:
         self._callback1 = self.plotter.addCallback("click mouse", self._on_left_click)
         self._callback2 = self.plotter.addCallback("key press", self._on_keypress)
         self._callback3 = self.plotter.addCallback('RightButtonPress', self._on_right_click)
-        self._slider1 = None
-        self._slider2 = None
-        self._slider1rep = None
-        self._slider2rep = None
+        self.slider1 = None
+        self.slider2 = None
 
 
     ######################################################
@@ -109,17 +110,16 @@ class TrackViewer:
         self.ntracks = len(self.uniquetracks)
         vedo.printc(f"  (found {self.ntracks} tracks)", c="y")
 
-        self._slider2 = self.plotter.at(1).addSlider2D(
+        self.slider2 = self.plotter.at(1).addSlider2D(
             self._slider_track,
             0,
             self.ntracks - 1,
             value=self.itrack,
             pos=([0.05, 0.94], [0.45, 0.94]),
-            title="track id",
+            title="Track ID",
             showValue=False,
             c="blue3",
         )
-        self._slider2rep = self._slider2.GetRepresentation()
 
     ######################################################
     def loadVolume(self, filename=""):
@@ -153,16 +153,15 @@ class TrackViewer:
             self.range = self.volume.scalarRange()
             self.range[1] = self.range[1] * 0.7
 
-        if self._slider1 is None:
-            self._slider1 = self.plotter.at(1).addSlider2D(
+        if self.slider1 is None:
+            self.slider1 = self.plotter.at(1).addSlider2D(
                 self._slider_time,
                 0, self.nframes - 1,
                 value=self.frame,
                 pos=([0.05, 0.06], [0.45, 0.06]),
-                title="frame number",
+                title="Frame number",
                 c="orange3",
             )
-            self._slider1rep = self._slider1.GetRepresentation()
 
     ######################################################
     def getPoints(self, track=None):
@@ -313,23 +312,23 @@ class TrackViewer:
         self.plotter.at(2).remove("PlotXY").add(mplot, render=False).resetCamera(tight=0.05)
 
         self.text2d.text("Press h for help")
-        self._slider1rep.SetValue(self.frame)
-        self._slider2rep.SetTitleText(f"track id {self.track}")
+        self.slider1.value = self.frame
+        self.slider2.title = f"Track ID {self.track}"
         self.plotter.render()
 
     ######################################################
     def _slider_time(self, obj, _):
-        self.frame = int(self._slider1rep.GetValue())
+        self.frame = int(self.slider1.value)
         self.update()
 
     def _slider_track(self, obj, _):
-        self.itrack = int(self._slider2rep.GetValue())
+        self.itrack = int(self.slider2.value)
         self.track = self.uniquetracks[self.itrack]
-        self._slider2rep.SetTitleText(f"track id {self.track}")
+        self.slider2.title = f"Track ID {self.track}"
         self.update()
 
     ######################################################
-    def _update_spline(self, closed=0):
+    def _update_spline(self, closed=False):
         self.plotter.remove([self.spline, self.spline_points])  # remove old points and spline
         self.spline_points = vedo.Points(self.spline_cpoints).ps(10).c('yellow4')
         self.spline_points.pickable(False)  # avoid picking the same point
@@ -396,6 +395,9 @@ class TrackViewer:
             return
         #------------------------------------------------
 
+        if "Shift" in k:
+            return
+
         if k == "t":
             self.input_mode = True
             self.input_string = ""
@@ -414,7 +416,7 @@ class TrackViewer:
             self.track = self.uniquetracks[self.itrack]
             line_pts = self.getPoints()
             self.frame = int(np.min(line_pts[:, 2]))
-            self._slider2rep.SetValue(self.itrack)
+            self.slider2.value = self.itrack
 
         elif k == "Down":
             self.itrack -= 1
@@ -424,7 +426,7 @@ class TrackViewer:
             self.track = self.uniquetracks[self.itrack]
             line_pts = self.getPoints()
             self.frame = int(np.min(line_pts[:, 2]))
-            self._slider2rep.SetValue(self.itrack)
+            self.slider2.value = self.itrack
 
         elif k == "Right":
             self.frame += 1
@@ -471,9 +473,8 @@ class TrackViewer:
                 focalPoint=(dx/2, dy/2, 0),
                 viewup=(0, 1, 0),
             )
-            self.plotter.at(1).remove(self.splines)
+            self.plotter.at(1).remove(self.spline)
             self.spline_cpoints = []
-            self.splines = []
             self.spline = None
             self.plotter.at(0).resetCamera()
             self.plotter.at(1).show(camera=cam)
@@ -484,8 +485,10 @@ class TrackViewer:
             return
 
         elif k == "J":
-            trid = vedo.io.ask(f"Insert the TRACKID to be joined to current track {self.track}",
-                               c='g', invert=True)
+            trid = vedo.io.ask(
+                f"Insert the TRACKID to be joined to current track {self.track}",
+                c='g', invert=True,
+            )
             try:
                 self.joinTracks(self.track, int(trid))
             except ValueError:
@@ -503,21 +506,60 @@ class TrackViewer:
             self.write()
             return
 
-        elif k == "d":
+        elif k == "o" and self.draw_mode is False:
             self.draw_mode = True
-            self.plotter.at(1).add(self.splines)
             vedo.printc("Spline drawing mode is now enabled", c='y', invert=True)
+            self.plotter.at(0).remove("closeby_trk_tube")
+            self.plotter.at(1).remove(self.spline).render()
+            self.spline_cpoints = []
+            self.spline = None
             return
 
-        elif k == "D":
+        elif k == "o":
             self._update_spline(closed=True)
             self.draw_mode = False
-            self.spline_cpoints = []
-            if self.spline not in self.splines:
-                self.splines.append(self.spline)
-                self.spline = None
             self.plotter.remove(self.spline_points).render()
             vedo.printc("Spline drawing mode disabled", c='y', invert=True)
+            return
+
+        elif k == "O":
+            if not self.spline:
+                vedo.printc("ERROR: There is no spline! Press d to draw it.", c='r', invert=True)
+                return
+            if self.draw_mode:
+                vedo.printc("ERROR: Press again d to close the line.", c='r', invert=True)
+                return
+            tracks = []
+            trackIDs = []
+            for t in set(self.dataframe["TRACK_ID"].to_numpy()):
+                pts = self.getPoints(t)
+                tracks.append(pts)
+                trackIDs += [t] * len(pts)
+            tracks = np.array(tracks)
+            vtracks = vedo.Lines(tracks)
+            vtracks.pointdata["trackID"] = np.array(trackIDs, dtype=int)
+            vtracks.cutWith2DLine(self.spline, invert=False)
+            rtracks = list(set(vtracks.pointdata["trackID"]))
+            vedo.printc("Contained tracks in spline:\n", rtracks, c='g')
+            for t in rtracks:
+                tpts = self.getPoints(t)
+                if len(tpts):
+                    closeby_track = vedo.Line(tpts, c="indigo8")
+                    closeby_track.name = "closeby_trk"
+                    self.plotter.at(0).add(closeby_track, render=False)
+
+            tube = self.spline.extrude(vtracks.zbounds()[1]).lw(0).c("yellow5").alpha(0.25)
+            tube.name = "closeby_trk_tube"
+            self.plotter.add(tube)
+            return
+
+        elif k == "p" and evt.picked3d is not None:
+            vedo.printc(
+                f"Mouse position: [{int(np.round(evt.picked3d[0]))},",
+                f"{int(np.round(evt.picked3d[1]))}]",
+                f"frame={self.frame}",
+                c='c', invert=True,
+            )
             return
 
         elif k == "q":
@@ -549,7 +591,7 @@ class TrackViewer:
         vedo.printc(f"..joined tracks IDs {track1} and {track2} to ID {track1}", c='g', invert=True)
         self.uniquetracks = np.unique(df["TRACK_ID"].to_numpy()).astype(int)
         self.ntracks = len(self.uniquetracks)
-        self._slider2rep.SetMaximumValue(self.ntracks - 1)
+        self.slider2.range = [0, self.ntracks-1]
         self.update()
 
     ######################################################
@@ -564,7 +606,7 @@ class TrackViewer:
         vedo.printc("..created new track with ID", newid, c="g", invert=True)
         self.uniquetracks = np.unique(df["TRACK_ID"].to_numpy()).astype(int)
         self.ntracks = len(self.uniquetracks)
-        self._slider2rep.SetMaximumValue(self.ntracks - 1)
+        self.slider2.range = [0, self.ntracks-1]
         self.update()
         return newid
 
