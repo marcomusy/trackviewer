@@ -527,7 +527,7 @@ class TrackViewer:
                 vedo.printc("ERROR: There is no spline! Press d to draw it.", c='r', invert=True)
                 return
             if self.draw_mode:
-                vedo.printc("ERROR: Press again d to close the line.", c='r', invert=True)
+                vedo.printc("ERROR: Press again o to close the line.", c='r', invert=True)
                 return
             tracks = []
             trackIDs = []
