@@ -6,6 +6,9 @@ from trackviewer import TrackViewer
 csv_path = "data/72h_spots.csv"
 tif_path = "data/72h_masks_sox9_mem.tif"
 ########################################################################################
+# csv_path = "/g/sharpe/scratch/ForMarco_From_Xavi/trackviewer_dataset/all_spots.csv"
+# tif_path = "/g/sharpe/scratch/ForMarco_From_Xavi/trackviewer_dataset/72h_masks_sox9_mem.tif"
+########################################################################################
 
 # Create the viewer
 tv = TrackViewer()

@@ -24,6 +24,7 @@
 - r to reset camera
 - q to quit"""
 
+import os
 import numpy as np
 import pandas
 from rich.table import Table
@@ -72,6 +73,7 @@ class TrackViewer:
         self.spline = None
         self.spline_cpoints = []
         self.spline_points = None
+        self.spline_tracks = None
 
         self.camera = dict(
             pos=(1147, -1405, 1198),
@@ -509,7 +511,7 @@ class TrackViewer:
         elif k == "o" and self.draw_mode is False:
             self.draw_mode = True
             vedo.printc("Spline drawing mode is now enabled", c='y', invert=True)
-            self.plotter.at(0).remove("closeby_trk_tube")
+            self.plotter.at(0).remove("closeby_trk")
             self.plotter.at(1).remove(self.spline).render()
             self.spline_cpoints = []
             self.spline = None
@@ -529,28 +531,42 @@ class TrackViewer:
             if self.draw_mode:
                 vedo.printc("ERROR: Press again o to close the line.", c='r', invert=True)
                 return
-            tracks = []
-            trackIDs = []
-            for t in set(self.dataframe["TRACK_ID"].to_numpy()):
-                pts = self.getPoints(t)
-                tracks.append(pts)
-                trackIDs += [t] * len(pts)
-            tracks = np.array(tracks)
-            vtracks = vedo.Lines(tracks)
-            vtracks.pointdata["trackID"] = np.array(trackIDs, dtype=int)
-            vtracks.cutWith2DLine(self.spline, invert=False)
+
+            if not self.spline_tracks:
+                tracks = []
+                trackIDs = []
+                for t in set(self.dataframe["TRACK_ID"].to_numpy()):
+                    pts = self.getPoints(t)
+                    if len(pts) == 0:  # some TRACK_ID can be empty
+                        continue
+                    tracks.append(pts)
+                    trackIDs += [t] * len(pts)
+                tracks = np.array(tracks)
+                self.spline_tracks = vedo.Lines(tracks)
+                self.spline_tracks.pointdata["trackID"] = np.array(trackIDs, dtype=int)
+
+            vtracks = self.spline_tracks.clone().cutWith2DLine(self.spline, invert=False)
             rtracks = list(set(vtracks.pointdata["trackID"]))
-            vedo.printc("Contained tracks in spline:\n", rtracks, c='g')
+            for i in range(1, 100):
+                fn = f"splinetracks_0{i}.txt" if i < 10 else f"splinetracks_{i}.txt"
+                if not os.path.isfile(fn):
+                    with open(fn, "w") as f:
+                        for tr in rtracks:
+                            f.write(str(tr)+'\n')
+                        break
+
             for t in rtracks:
                 tpts = self.getPoints(t)
                 if len(tpts):
                     closeby_track = vedo.Line(tpts, c="indigo8")
                     closeby_track.name = "closeby_trk"
                     self.plotter.at(0).add(closeby_track, render=False)
-
-            tube = self.spline.extrude(vtracks.zbounds()[1]).lw(0).c("yellow5").alpha(0.25)
-            tube.name = "closeby_trk_tube"
+            tube = self.spline.extrude(vtracks.zbounds(1)).lw(0).c("yellow5").alpha(0.25)
+            tube.name = "closeby_trk"
             self.plotter.add(tube)
+
+            vedo.printc(f"Tracks in current spline written to {fn}", c='g', invert=1)
+            self.plotter.screenshot(fn.replace(".txt", ".png"))
             return
 
         elif k == "p" and evt.picked3d is not None:
@@ -562,8 +578,12 @@ class TrackViewer:
             )
             return
 
+        elif k == "S":
+            self.plotter.screenshot()
+            return
+
         elif k == "q":
-            self.plotter.interactor.ExitCallback()
+            self.plotter.breakInteraction()
             return
 
         self.update()
