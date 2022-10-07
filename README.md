@@ -7,18 +7,16 @@ Browse interactively cell tracks from segmented samples
 pip install rich
 pip install -U git+https://github.com/marcomusy/vedo.git
 git clone https://github.com/marcomusy/trackviewer.git
-cd trackviewer
 ```
 
 ## To run
 
-Adjust the paths in `main.py` then:
-
 ```bash
+cd trackviewer
 python main.py
 ```
 
-![](https://user-images.githubusercontent.com/32848391/171412909-fb28f53d-aa42-4987-be4e-7cd6fb62d5da.png)
+![](https://user-images.githubusercontent.com/32848391/194614159-a4ad615a-dd3d-40c0-9381-6c83e6d1cc56.png)
 
 
 ## Mouse and Keyboard controls
@@ -26,14 +24,22 @@ python main.py
 While in the application press:
 ```
 - arrows to navigate
-  (left/right to change frame, up/down to change track)
-- mouse to rotate the scene in the left panel
+    left/right to change frame
+    up / down  to change track
+- drag mouse to rotate the scene in the left panel
 - right-click and drag to zoom in and out
-- left-click in the right panel to show closest tracks
+- click in right panel to show closest tracks
+- 1-9 (on keypad) or + to change volume channel
 - l to show track line
 - c to show closest ids
-- x to jump to track
-- t to input a specific track id (you need to click in your terminal)
+- x to jump to the closest track
+- t to manually input a track id
+- J to join the current track to a specified one
+- S to split the current track in half
+- W to write the edited track to disk
+- o to enable/disable drawing a reference spline
+- O to find tracks in the (anti-clock-wise) spline
+- p to print current mouse coordinates (in pixels)
 - r to reset camera
 - q to quit
 ```
