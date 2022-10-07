@@ -31,7 +31,7 @@ from rich.table import Table
 from rich.console import Console
 import vedo
 
-version = 0.9
+version = "0.10"
 
 ######################################################
 class TrackViewer:
@@ -76,9 +76,9 @@ class TrackViewer:
         self.spline_tracks = None
 
         self.camera = dict(
-            pos=(1147, -1405, 1198),
-            focalPoint=(284.3, 254.2, 366.9),
-            viewup=(-0.1758, 0.3662, 0.9138),
+            pos=(1145, -1405, 1200),
+            focalPoint=(285, 255, 370),
+            viewup=(-0.18, 0.36, 0.915),
         )
 
         vedo.settings.enableDefaultMouseCallbacks = False
@@ -92,12 +92,15 @@ class TrackViewer:
             dict(bottomleft=(0.29,0.76), topright=(0.498,0.998), bg='k9'),      # renderer2 (plot)
         ]
         self.plotter = vedo.Plotter(
-            shape=custom_shape, sharecam=False, title=f"Track Viewer v{version}", size=(2200,1100),
+            shape=custom_shape,
+            sharecam=False,
+            title=f"Track Viewer v{version}",
+            size=(2200, 1100),
         )
 
         self._callback1 = self.plotter.addCallback("click mouse", self._on_left_click)
         self._callback2 = self.plotter.addCallback("key press", self._on_keypress)
-        self._callback3 = self.plotter.addCallback('RightButtonPress', self._on_right_click)
+        self._callback3 = self.plotter.addCallback("RightButtonPress", self._on_right_click)
         self.slider1 = None
         self.slider2 = None
 
@@ -105,7 +108,7 @@ class TrackViewer:
     ######################################################
     def loadTracks(self, filename):
         """Load the track data from a cvs file"""
-        vedo.printc("Loading track data from", filename, c="y", end='')
+        vedo.printc("Loading track data from", filename, c="y", end="")
         self.dataframe = pandas.read_csv(filename, skip_blank_lines=True, skiprows=self.skiprows)
 
         self.uniquetracks = np.unique(self.dataframe["TRACK_ID"].to_numpy()).astype(int)
@@ -158,7 +161,8 @@ class TrackViewer:
         if self.slider1 is None:
             self.slider1 = self.plotter.at(1).addSlider2D(
                 self._slider_time,
-                0, self.nframes - 1,
+                0,
+                self.nframes - 1,
                 value=self.frame,
                 pos=([0.05, 0.06], [0.45, 0.06]),
                 title="Frame number",
@@ -193,9 +197,13 @@ class TrackViewer:
         df = self.dataframe
 
         if pt is None:
-            track_frame_df = df.loc[(df["FRAME"]==frame) & (df["TRACK_ID"]==track)]
-            px,py,pz = track_frame_df["POSITION_X"], track_frame_df["POSITION_Y"], track_frame_df["FRAME"]
-            pt = np.c_[px,py,pz]
+            track_frame_df = df.loc[(df["FRAME"] == frame) & (df["TRACK_ID"] == track)]
+            px, py, pz = (
+                track_frame_df["POSITION_X"],
+                track_frame_df["POSITION_Y"],
+                track_frame_df["FRAME"],
+            )
+            pt = np.c_[px, py, pz]
             if len(pt) == 0:
                 return
             pt = pt[0]
@@ -226,9 +234,9 @@ class TrackViewer:
                 closeby_track.name = "closeby_trk"
                 self.plotter.at(0).add(closeby_track, render=False)
 
-        trackpts_at_frame[:,2] = 0
-        cpts = vedo.Points(trackpts_at_frame[cids], c='w')
-        labels1 = cpts.labels("id", c=self.lcolor, justify='center', scale=self.lscale).shift(0,0,1)
+        trackpts_at_frame[:, 2] = 0
+        cpts = vedo.Points(trackpts_at_frame[cids], c="w")
+        labels1 = cpts.labels("id", c=self.lcolor, justify="center", scale=self.lscale).shift(0,0,1)
         labels1.name = "labels1"
         labels0 = labels1.clone(deep=False).z(self.frame + 0.1).pickable(False)
         labels0.name = "labels0"
@@ -298,7 +306,7 @@ class TrackViewer:
         # work out the average level of the self.monitor variable over the whole frame
         mframes, mon_levels = [], []
         for fr in range(minframe, maxframe, 5):
-            mm = self.dataframe.loc[(self.dataframe["FRAME"]==fr)][self.monitor].mean()
+            mm = self.dataframe.loc[(self.dataframe["FRAME"] == fr)][self.monitor].mean()
             mframes.append(fr)
             mon_levels.append(mm)
 
@@ -307,10 +315,10 @@ class TrackViewer:
         mplot = vedo.pyplot.plot(frames, level, 'o', ylim=self.yrange, title=title, aspect=16/9)
         mplot+= vedo.Line(np.c_[np.array(frames), vel+mplot.ylim[0]-1], c='tomato', lw=2)
         if len(mon_levels) > 2:
-            mplot+= vedo.Line(np.c_[np.array(mframes), np.array(mon_levels)], c='k4', lw=1)
+            mplot += vedo.Line(np.c_[np.array(mframes), np.array(mon_levels)], c="k4", lw=1)
 
         if pt2d is not None:  # some frames might be missing
-            mplot += vedo.Point([self.frame, level[res]], r=9, c='red6')
+            mplot += vedo.Point([self.frame, level[res]], r=9, c="red6")
         self.plotter.at(2).remove("PlotXY").add(mplot, render=False).resetCamera(tight=0.05)
 
         self.text2d.text("Press h for help")
@@ -332,18 +340,18 @@ class TrackViewer:
     ######################################################
     def _update_spline(self, closed=False):
         self.plotter.remove([self.spline, self.spline_points])  # remove old points and spline
-        self.spline_points = vedo.Points(self.spline_cpoints).ps(10).c('yellow4')
+        self.spline_points = vedo.Points(self.spline_cpoints).ps(10).c("yellow4")
         self.spline_points.pickable(False)  # avoid picking the same point
         if len(self.spline_cpoints) > 2:
-            self.spline = vedo.Spline(self.spline_cpoints, closed=closed).c('yellow5').lw(3)
+            self.spline = vedo.Spline(self.spline_cpoints, closed=closed).c("yellow5").lw(3)
             self.plotter.add(self.spline_points, self.spline)
         else:
             self.plotter.add(self.spline_points)
 
     ######################################################
     def _on_right_click(self, evt):
-        if self.draw_mode and evt.actor and len(self.spline_cpoints)>0:
-            self.spline_cpoints.pop() # pop removes from the list the last pt
+        if self.draw_mode and evt.actor and len(self.spline_cpoints) > 0:
+            self.spline_cpoints.pop()  # pop removes from the list the last pt
             self._update_spline()
 
     ######################################################
@@ -353,7 +361,7 @@ class TrackViewer:
             return
 
         if self.draw_mode:
-            p = evt.picked3d + [0,0,1]
+            p = evt.picked3d + [0, 0, 1]
             self.spline_cpoints.append(p)
             self._update_spline()
 
@@ -363,39 +371,39 @@ class TrackViewer:
 
     ######################################################
     def _interactive_keypress(self, key):
-            if key == "Return":
-                self.input_mode = False
-                if self.input_string.isdigit():
-                    self.track = int(self.input_string)
-                    line_pts = self.getPoints()
-                    if len(line_pts) == 0:
-                        self.input_text2d.text(f"Track {self.track} does not exist!")
-                        self.plotter.render()
-                        return
-                    self.frame = int(np.min(line_pts[:, 2]))
-                self.input_text2d.text("")
-                self.update()
-
-            elif key == "BackSpace":
-                if self.input_string:
-                    self.input_string = self.input_string[:-1]
-                    self.input_text2d.text("Jump to TrackID: " + self.input_string)
+        if key == "Return":
+            self.input_mode = False
+            if self.input_string.isdigit():
+                self.track = int(self.input_string)
+                line_pts = self.getPoints()
+                if len(line_pts) == 0:
+                    self.input_text2d.text(f"Track {self.track} does not exist!")
                     self.plotter.render()
+                    return
+                self.frame = int(np.min(line_pts[:, 2]))
+            self.input_text2d.text("")
+            self.update()
 
-            elif key.isdigit():
-                self.input_string += key
+        elif key == "BackSpace":
+            if self.input_string:
+                self.input_string = self.input_string[:-1]
                 self.input_text2d.text("Jump to TrackID: " + self.input_string)
                 self.plotter.render()
+
+        elif key.isdigit():
+            self.input_string += key
+            self.input_text2d.text("Jump to TrackID: " + self.input_string)
+            self.plotter.render()
 
     def _on_keypress(self, evt):
         """Press keys to perform some action"""
         k = evt.keyPressed
 
-        #------------------------------------------------
+        # ------------------------------------------------
         if self.input_mode:
             self._interactive_keypress(k)
             return
-        #------------------------------------------------
+        # ------------------------------------------------
 
         if "Shift" in k:
             return
@@ -407,7 +415,7 @@ class TrackViewer:
             self.plotter.render()
 
         elif k == "u":
-            self.input_mode=True
+            self.input_mode = True
             self.input_text2d.text(k)
 
         elif k == "Up":
@@ -458,8 +466,8 @@ class TrackViewer:
             return
 
         elif "KP_" in k:
-            kp = k.replace("KP_","").replace("End","1").replace("Down","2")
-            kp = kp.replace("Next","3").replace("Left","4").replace("Begin","5")
+            kp = k.replace("KP_", "").replace("End", "1").replace("Down", "2")
+            kp = kp.replace("Next", "3").replace("Left", "4").replace("Begin", "5")
             if kp.isdigit():
                 self.channel = int(kp)
                 self.loadVolume()
@@ -510,7 +518,7 @@ class TrackViewer:
 
         elif k == "o" and self.draw_mode is False:
             self.draw_mode = True
-            vedo.printc("Spline drawing mode is now enabled", c='y', invert=True)
+            vedo.printc("Spline drawing mode is now enabled", c="y", invert=True)
             self.plotter.at(0).remove("closeby_trk")
             self.plotter.at(1).remove(self.spline).render()
             self.spline_cpoints = []
@@ -521,21 +529,25 @@ class TrackViewer:
             self._update_spline(closed=True)
             self.draw_mode = False
             self.plotter.remove(self.spline_points).render()
-            vedo.printc("Spline drawing mode disabled", c='y', invert=True)
+            vedo.printc("Spline drawing mode disabled", c="y", invert=True)
             return
 
         elif k == "O":
             if not self.spline:
-                vedo.printc("ERROR: There is no spline! Press d to draw it.", c='r', invert=True)
+                vedo.printc("ERROR: There is no spline! Press d to draw it.", c="r", invert=True)
                 return
             if self.draw_mode:
-                vedo.printc("ERROR: Press again o to close the line.", c='r', invert=True)
+                vedo.printc("ERROR: Press again o to close the line.", c="r", invert=True)
                 return
 
             if not self.spline_tracks:
                 tracks = []
                 trackIDs = []
-                for t in set(self.dataframe["TRACK_ID"].to_numpy()):
+                vedo.printc("Selecting tracks..", c="y")
+                ltracks = set(self.dataframe["TRACK_ID"].to_numpy())
+                pb = vedo.ProgressBar(0, len(ltracks), c="y")
+                for t in ltracks:
+                    pb.print()
                     pts = self.getPoints(t)
                     if len(pts) == 0:  # some TRACK_ID can be empty
                         continue
@@ -552,9 +564,10 @@ class TrackViewer:
                 if not os.path.isfile(fn):
                     with open(fn, "w") as f:
                         for tr in rtracks:
-                            f.write(str(tr)+'\n')
+                            f.write(str(tr) + "\n")
                         break
 
+            vedo.printc("Visualising tracks..", c="y")
             for t in rtracks:
                 tpts = self.getPoints(t)
                 if len(tpts):
@@ -565,7 +578,7 @@ class TrackViewer:
             tube.name = "closeby_trk"
             self.plotter.add(tube)
 
-            vedo.printc(f"Tracks in current spline written to {fn}", c='g', invert=1)
+            vedo.printc(f"Tracks in current spline written to {fn}", c="g", invert=1)
             self.plotter.screenshot(fn.replace(".txt", ".png"))
             return
 
@@ -574,7 +587,8 @@ class TrackViewer:
                 f"Mouse position: [{int(np.round(evt.picked3d[0]))},",
                 f"{int(np.round(evt.picked3d[1]))}]",
                 f"frame={self.frame}",
-                c='c', invert=True,
+                c="c",
+                invert=True,
             )
             return
 
@@ -597,7 +611,7 @@ class TrackViewer:
         # Sanity checks
         tt = f" is overlapping with current track {track1}. Skip."
         if z0[0] < z1[0] < z0[-1]:
-            vedo.printc(f"ERROR: start frame of track {track2} {tt}", c='r', invert=True)
+            vedo.printc(f"ERROR: start frame of track {track2} {tt}", c="r", invert=True)
             return
         if z0[0] < z1[-1] < z0[-1]:
             vedo.printc(f"ERROR: end frame of track {track2} {tt}", c="r", invert=True)
@@ -611,7 +625,7 @@ class TrackViewer:
         vedo.printc(f"..joined tracks IDs {track1} and {track2} to ID {track1}", c='g', invert=True)
         self.uniquetracks = np.unique(df["TRACK_ID"].to_numpy()).astype(int)
         self.ntracks = len(self.uniquetracks)
-        self.slider2.range = [0, self.ntracks-1]
+        self.slider2.range = [0, self.ntracks - 1]
         self.update()
 
     ######################################################
@@ -626,7 +640,7 @@ class TrackViewer:
         vedo.printc("..created new track with ID", newid, c="g", invert=True)
         self.uniquetracks = np.unique(df["TRACK_ID"].to_numpy()).astype(int)
         self.ntracks = len(self.uniquetracks)
-        self.slider2.range = [0, self.ntracks-1]
+        self.slider2.range = [0, self.ntracks - 1]
         self.update()
         return newid
 
