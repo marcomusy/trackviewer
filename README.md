@@ -5,7 +5,8 @@ Browse interactively cell tracks from segmented samples
 ## To install
 ```bash
 pip install rich
-pip install -U git+https://github.com/marcomusy/vedo.git
+pip install -U vedo
+pip install vtk==9.0.3  # optional
 git clone https://github.com/marcomusy/trackviewer.git
 ```
 

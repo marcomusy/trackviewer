@@ -21,8 +21,8 @@ tv.monitor = "MEAN_INTENSITY_CH2"
 tv.yrange = [90, 130]
 
 # Load the data
-tv.loadTracks(csv_path)
-tv.loadVolume(tif_path)
+tv.load_tracks(csv_path)
+tv.load_volume(tif_path)
 
 tv.track = 1571
 tv.frame = 15
@@ -31,11 +31,11 @@ tv.frame = 15
 tv.start(interactive=False)
 
 # Programmatic usage:
-# newid = tv.splitTrack(13, frame=15)
-# tv.joinTracks(13, newid)
+# newid = tv.split_track(13, frame=15)
+# tv.join_tracks(13, newid)
 
-# tv.splitTrack(13834, frame=404)
-# tv.joinTracks(13834, 15570) # this will give error
+# tv.split_track(13834, frame=404)
+# tv.join_tracks(13834, 15570) # this will give error
 
 # tv.write("test.csv")
 

@@ -31,7 +31,7 @@ from rich.table import Table
 from rich.console import Console
 import vedo
 
-version = "0.10"
+version = "0.11"
 
 ######################################################
 class TrackViewer:
@@ -81,10 +81,10 @@ class TrackViewer:
             viewup=(-0.18, 0.36, 0.915),
         )
 
-        vedo.settings.enableDefaultMouseCallbacks = False
-        vedo.settings.enableDefaultKeyboardCallbacks = False
-        vedo.settings.defaultFont = "Calco"
-        # vedo.settings.useDepthPeeling = False
+        vedo.settings.enable_default_mouse_callbacks = False
+        vedo.settings.enable_default_keyboard_callbacks = False
+        vedo.settings.default_font = "Calco"
+        # vedo.settings.use_depth_peeling = False
 
         custom_shape = [
             dict(bottomleft=(0  ,0), topright=(0.5,1), bg='white', bg2='lightcyan'), # renderer0 (3d)
@@ -106,7 +106,7 @@ class TrackViewer:
 
 
     ######################################################
-    def loadTracks(self, filename):
+    def load_tracks(self, filename):
         """Load the track data from a cvs file"""
         vedo.printc("Loading track data from", filename, c="y", end="")
         self.dataframe = pandas.read_csv(filename, skip_blank_lines=True, skiprows=self.skiprows)
@@ -127,7 +127,7 @@ class TrackViewer:
         )
 
     ######################################################
-    def loadVolume(self, filename=""):
+    def load_volume(self, filename=""):
         """Load the 3-channel tif stack"""
 
         # channels are interleaved in the tif stack so self.nchannels is the step
@@ -155,7 +155,7 @@ class TrackViewer:
         vedo.printc(f"  (found {self.nframes} frames)", c="y")
 
         if len(self.range) == 0:
-            self.range = self.volume.scalarRange()
+            self.range = self.volume.scalar_range()
             self.range[1] = self.range[1] * 0.7
 
         if self.slider1 is None:
@@ -170,7 +170,7 @@ class TrackViewer:
             )
 
     ######################################################
-    def getPoints(self, track=None):
+    def get_points(self, track=None):
         """Get point coords for a track"""
         if track is None:
             track = self.track
@@ -181,9 +181,9 @@ class TrackViewer:
         return line_pts
 
     ######################################################
-    def getVelocity(self):
+    def get_velocity(self):
         """Get velocity for a track"""
-        line_pts = self.getPoints()
+        line_pts = self.get_points()
         line_pts0 = np.array(line_pts[:-1])
         line_pts1 = np.array(line_pts[1:])
         delta = line_pts1 - line_pts0
@@ -222,13 +222,13 @@ class TrackViewer:
         ids = np.c_[spotid, trackid, area, circ, sox9, finfo]
 
         vpts = vedo.Points(trackpts_at_frame)
-        cids = vpts.closestPoint(pt, N=self.nclosest, returnPointId=True)
+        cids = vpts.closest_point(pt, n=self.nclosest, return_point_id=True)
         self.closer_trackid = trackid.to_numpy()[cids[0]]
 
         for row in ids[cids]:
             self.plotter.at(0).remove("closeby_trk")
         for row in ids[cids]:
-            tpts = self.getPoints(row[1])
+            tpts = self.get_points(row[1])
             if len(tpts):
                 closeby_track = vedo.Line(tpts, c="indigo8")
                 closeby_track.name = "closeby_trk"
@@ -270,7 +270,7 @@ class TrackViewer:
         self.frame = min(self.frame, self.nframes - 1)
         self.frame = max(self.frame, 0)
 
-        slc1 = self.volume.zSlice(self.frame).lighting("off").z(-self.frame)
+        slc1 = self.volume.zslice(self.frame).lighting("off").z(-self.frame)
         slc1.cmap(self.cmap, vmin=self.range[0], vmax=self.range[1])
 
         slc1.name = "slice1"
@@ -279,14 +279,14 @@ class TrackViewer:
         self.plotter.at(0).remove("slice0").add(slc0, render=False)
         self.plotter.at(1).remove("slice1").add(slc1, render=False)
 
-        line_pts = self.getPoints()
+        line_pts = self.get_points()
         if len(line_pts) == 0:
             return
         frames = line_pts[:, 2]
         minframe, maxframe = np.min(frames).astype(int), np.max(frames).astype(int)
         trackline = vedo.Line(line_pts, lw=3, c="orange5")
         trackline.name = "track"
-        vel = self.getVelocity()
+        vel = self.get_velocity()
         trackline.cmap("autumn_r", vel, vmin=0, vmax=self.maxvelocity)
         self.plotter.at(0).remove("track", "labels0").add(trackline, render=False)
 
@@ -299,7 +299,7 @@ class TrackViewer:
             res = np.where(frames == self.frame)[0]
             if len(res):  # some frames might be missing
                 pt2d = vedo.Point(line_pts[res[0]], c="red6", r=10).z(0)
-                pt2d.pickable(False).useBounds(False)
+                pt2d.pickable(False).use_bounds(False)
                 pt2d.name = "pt2d"
                 self.plotter.add(pt2d, render=False)
 
@@ -319,7 +319,7 @@ class TrackViewer:
 
         if pt2d is not None:  # some frames might be missing
             mplot += vedo.Point([self.frame, level[res]], r=9, c="red6")
-        self.plotter.at(2).remove("PlotXY").add(mplot, render=False).resetCamera(tight=0.05)
+        self.plotter.at(2).remove("PlotXY").add(mplot, render=False).reset_camera(tight=0.05)
 
         self.text2d.text("Press h for help")
         self.slider1.value = self.frame
@@ -375,7 +375,7 @@ class TrackViewer:
             self.input_mode = False
             if self.input_string.isdigit():
                 self.track = int(self.input_string)
-                line_pts = self.getPoints()
+                line_pts = self.get_points()
                 if len(line_pts) == 0:
                     self.input_text2d.text(f"Track {self.track} does not exist!")
                     self.plotter.render()
@@ -424,7 +424,7 @@ class TrackViewer:
                 self.itrack = self.ntracks - 1
                 return
             self.track = self.uniquetracks[self.itrack]
-            line_pts = self.getPoints()
+            line_pts = self.get_points()
             self.frame = int(np.min(line_pts[:, 2]))
             self.slider2.value = self.itrack
 
@@ -434,7 +434,7 @@ class TrackViewer:
                 self.itrack = 0
                 return
             self.track = self.uniquetracks[self.itrack]
-            line_pts = self.getPoints()
+            line_pts = self.get_points()
             self.frame = int(np.min(line_pts[:, 2]))
             self.slider2.value = self.itrack
 
@@ -445,7 +445,7 @@ class TrackViewer:
             self.frame -= 1
 
         elif k == "l":
-            line_pts = self.getPoints()
+            line_pts = self.get_points()
             if line_pts is None:
                 return
             trackline2d = vedo.Line(line_pts[:, (0, 1)], c="o6", alpha=0.5).z(0.1)
@@ -470,11 +470,11 @@ class TrackViewer:
             kp = kp.replace("Next", "3").replace("Left", "4").replace("Begin", "5")
             if kp.isdigit():
                 self.channel = int(kp)
-                self.loadVolume()
+                self.load_volume()
 
         elif "plus" in k:
             self.channel = (self.channel + 1) % self.nchannels
-            self.loadVolume()
+            self.load_volume()
 
         elif k == "r":
             dx, dy, _ = self.volume.dimensions()
@@ -500,14 +500,14 @@ class TrackViewer:
                 c='g', invert=True,
             )
             try:
-                self.joinTracks(self.track, int(trid))
+                self.join_tracks(self.track, int(trid))
             except ValueError:
                 vedo.printc("Could not join tracks. Skipped.")
             return
 
         elif k == "S":
             try:
-                self.splitTrack(self.track)
+                self.split_track(self.track)
             except ValueError:
                 vedo.printc(f"Could not split track {self.track}. Skipped.")
             return
@@ -548,7 +548,7 @@ class TrackViewer:
                 pb = vedo.ProgressBar(0, len(ltracks), c="y")
                 for t in ltracks:
                     pb.print()
-                    pts = self.getPoints(t)
+                    pts = self.get_points(t)
                     if len(pts) == 0:  # some TRACK_ID can be empty
                         continue
                     tracks.append(pts)
@@ -557,7 +557,7 @@ class TrackViewer:
                 self.spline_tracks = vedo.Lines(tracks)
                 self.spline_tracks.pointdata["trackID"] = np.array(trackIDs, dtype=int)
 
-            vtracks = self.spline_tracks.clone().cutWith2DLine(self.spline, invert=False)
+            vtracks = self.spline_tracks.clone().cut_with_line(self.spline, invert=False)
             rtracks = list(set(vtracks.pointdata["trackID"]))
             for i in range(1, 100):
                 fn = f"splinetracks_0{i}.txt" if i < 10 else f"splinetracks_{i}.txt"
@@ -569,7 +569,7 @@ class TrackViewer:
 
             vedo.printc("Visualising tracks..", c="y")
             for t in rtracks:
-                tpts = self.getPoints(t)
+                tpts = self.get_points(t)
                 if len(tpts):
                     closeby_track = vedo.Line(tpts, c="indigo8")
                     closeby_track.name = "closeby_trk"
@@ -597,16 +597,16 @@ class TrackViewer:
             return
 
         elif k == "q":
-            self.plotter.breakInteraction()
+            self.plotter.break_interaction()
             return
 
         self.update()
 
     ######################################################
-    def joinTracks(self, track1, track2):
+    def join_tracks(self, track1, track2):
         """Join two tracks. The ID of the second input is overwritten by the first"""
-        z0 = self.getPoints(track1)[:, 2]
-        z1 = self.getPoints(track2)[:, 2]
+        z0 = self.get_points(track1)[:, 2]
+        z1 = self.get_points(track2)[:, 2]
 
         # Sanity checks
         tt = f" is overlapping with current track {track1}. Skip."
@@ -629,7 +629,7 @@ class TrackViewer:
         self.update()
 
     ######################################################
-    def splitTrack(self, trid, frame=None):
+    def split_track(self, trid, frame=None):
         """Split a track starting from current/specified frame and return a new ID"""
         if frame is None:
             frame = self.frame
@@ -654,7 +654,7 @@ class TrackViewer:
     ######################################################
     def start(self, interactive=True):
         """Initialize and start the interactive application"""
-        slc = self.volume.zSlice(self.frame).lighting("off").z(-self.frame)
+        slc = self.volume.zslice(self.frame).lighting("off").z(-self.frame)
         slc.cmap(self.cmap, vmin=self.range[0], vmax=self.range[1])
 
         self.text2d = vedo.Text2D("Press h for help", font="Calco", bg="yellow9", alpha=1)
