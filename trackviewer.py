@@ -397,7 +397,12 @@ class TrackViewer:
 
     def _on_keypress(self, evt):
         """Press keys to perform some action"""
-        k = evt.keyPressed
+        k = evt.keypress
+
+        # HACK for vedo2022.4.1: needed by vtk9.2 because key is kept lowercase wrt vtk9.0
+        if hasattr(self.plotter, "keyheld") and "Shift_" in self.plotter.keyheld and len(k)==1:
+            k = k.upper()
+            self.plotter.keyheld = ''
 
         # ------------------------------------------------
         if self.input_mode:
@@ -534,10 +539,10 @@ class TrackViewer:
 
         elif k == "O":
             if not self.spline:
-                vedo.printc("ERROR: There is no spline! Press d to draw it.", c="r", invert=True)
+                vedo.printc("There is no spline! Press o to draw it.", c="r", invert=True)
                 return
             if self.draw_mode:
-                vedo.printc("ERROR: Press again o to close the line.", c="r", invert=True)
+                vedo.printc("Press again o to close the line.", c="r", invert=True)
                 return
 
             if not self.spline_tracks:
