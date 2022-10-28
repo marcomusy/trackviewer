@@ -31,7 +31,7 @@ from rich.table import Table
 from rich.console import Console
 import vedo
 
-version = "0.11"
+version = "1.0"
 
 ######################################################
 class TrackViewer:
@@ -77,19 +77,18 @@ class TrackViewer:
 
         self.camera = dict(
             pos=(1145, -1405, 1200),
-            focalPoint=(285, 255, 370),
+            focal_point=(285, 255, 370),
             viewup=(-0.18, 0.36, 0.915),
         )
 
         vedo.settings.enable_default_mouse_callbacks = False
         vedo.settings.enable_default_keyboard_callbacks = False
         vedo.settings.default_font = "Calco"
-        # vedo.settings.use_depth_peeling = False
 
         custom_shape = [
             dict(bottomleft=(0  ,0), topright=(0.5,1), bg='white', bg2='lightcyan'), # renderer0 (3d)
-            dict(bottomleft=(0.5,0), topright=(1.0,1), bg='white'),             # renderer1 (2d scene)
-            dict(bottomleft=(0.29,0.76), topright=(0.498,0.998), bg='k9'),      # renderer2 (plot)
+            dict(bottomleft=(0.5,0), topright=(1.0,1), bg='white'),            # renderer1 (2d scene)
+            dict(bottomleft=(0.29,0.76), topright=(0.498,0.998), bg='k9'),     # renderer2 (2d plot)
         ]
         self.plotter = vedo.Plotter(
             shape=custom_shape,
@@ -98,9 +97,9 @@ class TrackViewer:
             size=(2200, 1100),
         )
 
-        self._callback1 = self.plotter.addCallback("click mouse", self._on_left_click)
-        self._callback2 = self.plotter.addCallback("key press", self._on_keypress)
-        self._callback3 = self.plotter.addCallback("RightButtonPress", self._on_right_click)
+        self._callback1 = self.plotter.add_callback("click mouse", self._on_left_click)
+        self._callback2 = self.plotter.add_callback("key press", self._on_keypress)
+        self._callback3 = self.plotter.add_callback("RightButtonPress", self._on_right_click)
         self.slider1 = None
         self.slider2 = None
 
@@ -115,14 +114,14 @@ class TrackViewer:
         self.ntracks = len(self.uniquetracks)
         vedo.printc(f"  (found {self.ntracks} tracks)", c="y")
 
-        self.slider2 = self.plotter.at(1).addSlider2D(
+        self.slider2 = self.plotter.at(1).add_slider(
             self._slider_track,
             0,
             self.ntracks - 1,
             value=self.itrack,
             pos=([0.05, 0.94], [0.45, 0.94]),
             title="Track ID",
-            showValue=False,
+            show_value=False,
             c="blue3",
         )
 
@@ -159,7 +158,7 @@ class TrackViewer:
             self.range[1] = self.range[1] * 0.7
 
         if self.slider1 is None:
-            self.slider1 = self.plotter.at(1).addSlider2D(
+            self.slider1 = self.plotter.at(1).add_slider(
                 self._slider_time,
                 0,
                 self.nframes - 1,
@@ -191,7 +190,7 @@ class TrackViewer:
         return vedo.mag(np.array(delta))
 
     ######################################################
-    def getClosest(self, pt=None):
+    def get_closest(self, pt=None):
         frame = self.frame
         track = self.track
         df = self.dataframe
@@ -367,10 +366,11 @@ class TrackViewer:
 
         else:
             pt = np.array([evt.picked3d[0], evt.picked3d[1], self.frame])
-            self.getClosest(pt)
+            self.get_closest(pt)
 
     ######################################################
     def _interactive_keypress(self, key):
+        # used to input values from window
         if key == "Return":
             self.input_mode = False
             if self.input_string.isdigit():
@@ -398,11 +398,12 @@ class TrackViewer:
     def _on_keypress(self, evt):
         """Press keys to perform some action"""
         k = evt.keypress
+        if not k: return
 
         # HACK for vedo2022.4.1: needed by vtk9.2 because key is kept lowercase wrt vtk9.0
-        if hasattr(self.plotter, "keyheld") and "Shift_" in self.plotter.keyheld and len(k)==1:
-            k = k.upper()
-            self.plotter.keyheld = ''
+        # if hasattr(self.plotter, "keyheld") and "Shift_" in self.plotter.keyheld and len(k)==1:
+        #     k = k.upper()
+        #     self.plotter.keyheld = ''
 
         # ------------------------------------------------
         if self.input_mode:
@@ -410,18 +411,11 @@ class TrackViewer:
             return
         # ------------------------------------------------
 
-        if "Shift" in k:
-            return
-
         if k == "t":
             self.input_mode = True
             self.input_string = ""
             self.input_text2d.text("Jump to TrackID: " + self.input_string)
             self.plotter.render()
-
-        elif k == "u":
-            self.input_mode = True
-            self.input_text2d.text(k)
 
         elif k == "Up":
             self.itrack += 1
@@ -467,7 +461,7 @@ class TrackViewer:
             self.closer_trackid = None
 
         elif k == "c":
-            self.getClosest()
+            self.get_closest()
             return
 
         elif "KP_" in k:
@@ -485,17 +479,21 @@ class TrackViewer:
             dx, dy, _ = self.volume.dimensions()
             cam = dict(
                 pos=(dx/2, dy/2, (dx+dy)/2*3),
-                focalPoint=(dx/2, dy/2, 0),
+                focal_point=(dx/2, dy/2, 0),
                 viewup=(0, 1, 0),
             )
             self.plotter.at(1).remove(self.spline)
             self.spline_cpoints = []
             self.spline = None
-            self.plotter.at(0).resetCamera()
+            self.plotter.at(0).reset_camera()
+            self.plotter.at(1).remove("track2d")
             self.plotter.at(1).show(camera=cam)
 
         elif k == "h":
-            self.text2d.text(__doc__)
+            if len(self.text2d.text())>20:
+                self.text2d.text("Press h for help")
+            else:
+                self.text2d.text(__doc__)
             self.plotter.render()
             return
 
@@ -665,12 +663,14 @@ class TrackViewer:
         self.text2d = vedo.Text2D("Press h for help", font="Calco", bg="yellow9", alpha=1)
         self.input_text2d = vedo.Text2D(font="Calco", c='w', bg="blue3", alpha=1, pos='bottom-left', s=1.3)
 
-        axes = vedo.Axes(self.volume, xtitle="x /pixel", ytitle="y /pixel", ztitle="frame nr.")
+        axes = vedo.Axes(
+            self.volume, xtitle="x /pixel", ytitle="y /pixel", ztitle="frame nr.",
+            xtitle_backface_color='t', ytitle_backface_color='t', ztitle_backface_color='t',
+        )
 
         self.plotter.at(0).show(axes, self.text2d, self.input_text2d, camera=self.camera, bg2="light cyan")
         self.plotter.at(1).show(slc, resetcam=True, zoom=1.1)
         self.update()
         if interactive:
             self.plotter.interactive()
-        return self.plotter
 
