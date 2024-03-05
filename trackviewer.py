@@ -97,9 +97,9 @@ class TrackViewer:
             size=(2200, 1100),
         )
 
-        self._callback1 = self.plotter.add_callback("click mouse", self._on_left_click)
+        self._callback1 = self.plotter.add_callback("left click mouse", self._on_left_click)
         self._callback2 = self.plotter.add_callback("key press", self._on_keypress)
-        self._callback3 = self.plotter.add_callback("RightButtonPress", self._on_right_click)
+        self._callback3 = self.plotter.add_callback("right click mouse", self._on_right_click)
         self.slider1 = None
         self.slider2 = None
 
@@ -134,7 +134,7 @@ class TrackViewer:
         if self.volumes[ch] is not None:
             self.volume = self.volumes[ch]
             if len(self.range) == 0:
-                self.range = self.volume.scalarRange()
+                self.range = self.volume.scalar_range()
                 self.range[1] = self.range[1] * 0.7
             return self.volume
 
@@ -231,7 +231,7 @@ class TrackViewer:
             if len(tpts):
                 closeby_track = vedo.Line(tpts, c="indigo8")
                 closeby_track.name = "closeby_trk"
-                self.plotter.at(0).add(closeby_track, render=False)
+                self.plotter.at(0).add(closeby_track)
 
         trackpts_at_frame[:, 2] = 0
         cpts = vedo.Points(trackpts_at_frame[cids], c="w")
@@ -240,8 +240,8 @@ class TrackViewer:
         labels0 = labels1.clone(deep=False).z(self.frame + 0.1).pickable(False)
         labels0.name = "labels0"
 
-        self.plotter.at(0).remove("labels0").add(labels0, render=False)
-        self.plotter.at(1).remove("labels1").add(labels1)
+        self.plotter.at(0).remove("labels0").add(labels0)
+        self.plotter.at(1).remove("labels1").add(labels1).render()
 
         rtable = Table(title_justify="left")
         rtable.add_column(header="Index", style="yellow", no_wrap=True)
@@ -273,24 +273,25 @@ class TrackViewer:
         slc1.cmap(self.cmap, vmin=self.range[0], vmax=self.range[1])
 
         slc1.name = "slice1"
-        slc0 = slc1.clone(transformed=True, deep=False).z(self.frame).pickable(False)
+        slc0 = slc1.clone(deep=False).z(self.frame).pickable(False)
         slc0.name = "slice0"
-        self.plotter.at(0).remove("slice0").add(slc0, render=False)
-        self.plotter.at(1).remove("slice1").add(slc1, render=False)
+        self.plotter.at(0).remove("slice0").add(slc0)
+        self.plotter.at(1).remove("slice1").add(slc1).render()
 
         line_pts = self.get_points()
         if len(line_pts) == 0:
             return
+
         frames = line_pts[:, 2]
         minframe, maxframe = np.min(frames).astype(int), np.max(frames).astype(int)
         trackline = vedo.Line(line_pts, lw=3, c="orange5")
         trackline.name = "track"
         vel = self.get_velocity()
         trackline.cmap("autumn_r", vel, vmin=0, vmax=self.maxvelocity)
-        self.plotter.at(0).remove("track", "labels0").add(trackline, render=False)
+        self.plotter.at(0).remove("track", "labels0").add(trackline)
 
-        for row in range(self.nclosest):
-            self.plotter.remove("closeby_trk")
+        # for _ in range(self.nclosest):
+        self.plotter.remove("closeby_trk")
 
         self.plotter.at(1).remove("pt2d", "track2d", "labels1")
         pt2d = None
@@ -300,7 +301,7 @@ class TrackViewer:
                 pt2d = vedo.Point(line_pts[res[0]], c="red6", r=10).z(0)
                 pt2d.pickable(False).use_bounds(False)
                 pt2d.name = "pt2d"
-                self.plotter.add(pt2d, render=False)
+                self.plotter.add(pt2d)
 
         # work out the average level of the self.monitor variable over the whole frame
         mframes, mon_levels = [], []
@@ -317,8 +318,8 @@ class TrackViewer:
             mplot += vedo.Line(np.c_[np.array(mframes), np.array(mon_levels)], c="k4", lw=1)
 
         if pt2d is not None:  # some frames might be missing
-            mplot += vedo.Point([self.frame, level[res]], r=9, c="red6")
-        self.plotter.at(2).remove("PlotXY").add(mplot, render=False).reset_camera(tight=0.05)
+            mplot += vedo.Point([self.frame, level[res][0]], r=9, c="red6")
+        self.plotter.at(2).remove("PlotXY").add(mplot).reset_camera(tight=0.05)
 
         self.text2d.text("Press h for help")
         self.slider1.value = self.frame
@@ -346,6 +347,7 @@ class TrackViewer:
             self.plotter.add(self.spline_points, self.spline)
         else:
             self.plotter.add(self.spline_points)
+        self.plotter.render()
 
     ######################################################
     def _on_right_click(self, evt):
@@ -449,7 +451,7 @@ class TrackViewer:
                 return
             trackline2d = vedo.Line(line_pts[:, (0, 1)], c="o6", alpha=0.5).z(0.1)
             trackline2d.name = "track2d"
-            self.plotter.at(1).remove("track2d").add(trackline2d)
+            self.plotter.at(1).remove("track2d").add(trackline2d).render()
             return
 
         elif k == "x":
@@ -556,7 +558,7 @@ class TrackViewer:
                         continue
                     tracks.append(pts)
                     trackIDs += [t] * len(pts)
-                tracks = np.array(tracks)
+                # tracks = np.array(tracks)
                 self.spline_tracks = vedo.Lines(tracks)
                 self.spline_tracks.pointdata["trackID"] = np.array(trackIDs, dtype=int)
 
@@ -576,10 +578,10 @@ class TrackViewer:
                 if len(tpts):
                     closeby_track = vedo.Line(tpts, c="indigo8")
                     closeby_track.name = "closeby_trk"
-                    self.plotter.at(0).add(closeby_track, render=False)
+                    self.plotter.at(0).add(closeby_track)
             tube = self.spline.extrude(vtracks.zbounds(1)).lw(0).c("yellow5").alpha(0.25)
             tube.name = "closeby_trk"
-            self.plotter.add(tube)
+            self.plotter.add(tube).render()
 
             vedo.printc(f"Tracks in current spline written to {fn}", c="g", invert=1)
             self.plotter.screenshot(fn.replace(".txt", ".png"))
