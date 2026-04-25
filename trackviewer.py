@@ -224,8 +224,7 @@ class TrackViewer:
         cids = vpts.closest_point(pt, n=self.nclosest, return_point_id=True)
         self.closer_trackid = trackid.to_numpy()[cids[0]]
 
-        for row in ids[cids]:
-            self.plotter.at(0).remove("closeby_trk")
+        self.plotter.at(0).remove("closeby_trk")
         for row in ids[cids]:
             tpts = self.get_points(row[1])
             if len(tpts):
@@ -289,8 +288,6 @@ class TrackViewer:
         vel = self.get_velocity()
         trackline.cmap("autumn_r", vel, vmin=0, vmax=self.maxvelocity)
         self.plotter.at(0).remove("track", "labels0").add(trackline)
-
-        # for _ in range(self.nclosest):
         self.plotter.remove("closeby_trk")
 
         self.plotter.at(1).remove("pt2d", "track2d", "labels1")
@@ -402,11 +399,6 @@ class TrackViewer:
         k = evt.keypress
         if not k: return
 
-        # HACK for vedo2022.4.1: needed by vtk9.2 because key is kept lowercase wrt vtk9.0
-        # if hasattr(self.plotter, "keyheld") and "Shift_" in self.plotter.keyheld and len(k)==1:
-        #     k = k.upper()
-        #     self.plotter.keyheld = ''
-
         # ------------------------------------------------
         if self.input_mode:
             self._interactive_keypress(k)
@@ -447,7 +439,7 @@ class TrackViewer:
 
         elif k == "l":
             line_pts = self.get_points()
-            if line_pts is None:
+            if len(line_pts) == 0:
                 return
             trackline2d = vedo.Line(line_pts[:, (0, 1)], c="o6", alpha=0.5).z(0.1)
             trackline2d.name = "track2d"
@@ -595,10 +587,6 @@ class TrackViewer:
                 c="c",
                 invert=True,
             )
-            return
-
-        elif k == "S":
-            self.plotter.screenshot()
             return
 
         elif k == "q":
