@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-from vedo.io import download
+from vedo import download
 from trackviewer import TrackViewer
 
 # Data ##################################################################################

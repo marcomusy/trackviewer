@@ -311,7 +311,7 @@ class TrackViewer:
             mon_levels.append(mm)
 
         level = self.dataframe.loc[self.dataframe["TRACK_ID"]==self.track][self.monitor].to_numpy()
-        title = self.monitor.replace("_","\_")
+        title = self.monitor.replace("_", r"\_")
         mplot = vedo.pyplot.plot(frames, level, 'o', ylim=self.yrange, title=title, aspect=16/9)
         mplot+= vedo.Line(np.c_[np.array(frames), vel+mplot.ylim[0]-1], c='tomato', lw=2)
         if len(mon_levels) > 2:
@@ -500,7 +500,7 @@ class TrackViewer:
             return
 
         elif k == "J":
-            trid = vedo.io.ask(
+            trid = vedo.ask(
                 f"Insert the TRACKID to be joined to current track {self.track}",
                 c='g', invert=True,
             )
@@ -579,7 +579,7 @@ class TrackViewer:
                     closeby_track = vedo.Line(tpts, c="indigo8")
                     closeby_track.name = "closeby_trk"
                     self.plotter.at(0).add(closeby_track)
-            tube = self.spline.extrude(vtracks.zbounds(1)).lw(0).c("yellow5").alpha(0.25)
+            tube = self.spline.extrude(vtracks.zbounds()[1]).lw(0).c("yellow5").alpha(0.25)
             tube.name = "closeby_trk"
             self.plotter.add(tube).render()
 
